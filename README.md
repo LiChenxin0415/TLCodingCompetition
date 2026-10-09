@@ -128,9 +128,29 @@ git push origin main
 
 ### 首次克隆（使用 SSH 443 通道）
 
-```bash
+> ⚠️ 本机 Git 自带的 ssh 不可用（原因见下一节），**必须先指定 SSH 客户端再克隆**，
+> 否则会报 `fatal: Could not read from remote repository`。
+
+PowerShell：
+
+```powershell
+$env:GIT_SSH_COMMAND = "C:/Windows/System32/OpenSSH/ssh.exe"
 git clone ssh://git@ssh.github.com:443/LiChenxin0415/TLCodingCompetition.git
 cd TLCodingCompetition
+```
+
+Bash / Git Bash：
+
+```bash
+export GIT_SSH_COMMAND="C:/Windows/System32/OpenSSH/ssh.exe"
+git clone ssh://git@ssh.github.com:443/LiChenxin0415/TLCodingCompetition.git
+cd TLCodingCompetition
+```
+
+只对这一次命令生效、不改环境变量的写法：
+
+```bash
+git -c core.sshCommand="C:/Windows/System32/OpenSSH/ssh.exe" clone ssh://git@ssh.github.com:443/LiChenxin0415/TLCodingCompetition.git
 ```
 
 ### 已有仓库时配置 origin
@@ -141,24 +161,37 @@ git remote set-url origin ssh://git@ssh.github.com:443/LiChenxin0415/TLCodingCom
 
 ### ⚠️ Windows 必要配置：git 内置 ssh 不可用
 
-本机 Git 自带的 cygwin `ssh.exe` 在沙箱环境下启动失败，必须改用 Windows 原生 OpenSSH：
+本机 Git 自带的 cygwin `ssh.exe` 在沙箱环境下启动失败（报
+`fatal error - CreateFileMapping ... Win32 error 5`），必须改用 Windows 原生 OpenSSH。
+三种等效做法，任选其一：
 
 ```bash
-# 在当前仓库生效（推荐，每个克隆下来的仓库都执行一次）
+# 方式 A（推荐，全局无侵入）：临时环境变量，当前终端会话内所有 git 命令生效
+#   PowerShell: $env:GIT_SSH_COMMAND = "C:/Windows/System32/OpenSSH/ssh.exe"
+#   Bash:       export GIT_SSH_COMMAND="C:/Windows/System32/OpenSSH/ssh.exe"
+
+# 方式 B：写入当前仓库配置（本仓库已配置好，无需重复执行）
 git config core.sshCommand "C:/Windows/System32/OpenSSH/ssh.exe"
 
-# 首次连接时把主机密钥写入 known_hosts（缺省会因校验失败而拒绝连接）
+# 方式 C：只对单条命令生效
+git -c core.sshCommand="C:/Windows/System32/OpenSSH/ssh.exe" <命令>
+
+# 主机密钥（本机 known_hosts 已写入，换机器时需要执行一次）
 "C:/Windows/System32/OpenSSH/ssh-keyscan.exe" -p 443 ssh.github.com >> C:/Users/<用户名>/.ssh/known_hosts
 ```
 
 验证通道是否可用：
 
 ```bash
-ssh -T -p 443 git@ssh.github.com     # 期望输出：Hi <用户名>! You've successfully authenticated...
+# 注意用原生 ssh 验证，不要用 PATH 里 git 自带的 ssh
+"C:/Windows/System32/OpenSSH/ssh.exe" -T -p 443 git@ssh.github.com
+# 期望输出：Hi <用户名>! You've successfully authenticated...
 ```
 
 > 使用 HTTPS 代理时（`127.0.0.1:7890`）：`git config --global http.proxy http://127.0.0.1:7890`，
 > 但注意 `github.com` 走代理仍会被重置，推送请一律使用上面的 SSH 443 通道。
+> 本机 `.git/config` 中的 `core.sshCommand` 属于**本地配置、不会随仓库分发**，
+> 因此换目录/换机器克隆时请按上面方式 A 或 C 操作。
 
 ---
 

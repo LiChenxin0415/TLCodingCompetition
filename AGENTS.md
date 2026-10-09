@@ -53,4 +53,8 @@ git push origin main
 
 - 远程地址：`ssh://git@ssh.github.com:443/LiChenxin0415/TLCodingCompetition.git`
 - `github.com:443` 直连不可用，必须走 SSH 443 通道。
-- Windows 下需先设置：`git config core.sshCommand "C:/Windows/System32/OpenSSH/ssh.exe"`
+- Windows 下 Git 自带 ssh 会崩溃，任何 git 远程操作前先在本终端执行：
+  - PowerShell：`$env:GIT_SSH_COMMAND = "C:/Windows/System32/OpenSSH/ssh.exe"`
+  - Bash：`export GIT_SSH_COMMAND="C:/Windows/System32/OpenSSH/ssh.exe"`
+  - 或在本仓库执行过一次：`git config core.sshCommand "C:/Windows/System32/OpenSSH/ssh.exe"`
+- 克隆全新目录时**必须先设好上面的环境变量再 clone**，否则会失败。
