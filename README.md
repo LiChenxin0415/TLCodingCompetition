@@ -213,7 +213,88 @@ material/
 
 ---
 
-## 六、待补充（随项目推进更新）
+## 六、同事 / 新机器接入与 push 失败排查
+
+> 本仓库是 **public（公开）**：任何人都能 `clone`（读），但**只有 Collaborator 才能 `push`（写）**。
+> 因此「能拉代码、但提交被拒」基本可以锁定为**权限或网络通道**问题，而不是代码问题。
+
+### 第 1 步：确认邀请是否真的已接受（仓库所有者检查）
+
+打开 `Settings → Collaborators and teams`（即
+`https://github.com/LiChenxin0415/TLCodingCompetition/settings/access`）：
+
+| 显示状态 | 含义 | 处理 |
+| --- | --- | --- |
+| `Pending invite` / 待接受 | **邀请尚未生效**，对方还没有写权限 | 让对方到邮箱点接受（注意垃圾邮件），或在 GitHub 通知页接受；邀请 **7 天过期**需重发 |
+| 已显示为成员 | 权限已生效 | 转第 2 步 |
+
+⚠️ 常见坑：邀请邮件会发到**该邮箱所绑定的 GitHub 账号**。若对方 GitHub 账号没有绑定这个邮箱，
+对方**根本看不到邀请**。此时应让对方提供其 GitHub 用户名，按用户名邀请，或让对方先把该邮箱
+加到自己的 GitHub 账号（Settings → Emails）。
+
+### 第 2 步：判断卡在哪一层（同事在本机执行）
+
+```powershell
+# A. 本地能不能提交（报 "Please tell me who you are" 说明是本地身份未配置）
+git config user.name ; git config user.email
+
+# B. 通道通不通（两条分别测）
+git ls-remote https://github.com/LiChenxin0415/TLCodingCompetition.git
+git ls-remote ssh://git@ssh.github.com:443/LiChenxin0415/TLCodingCompetition.git
+
+# C. 写权限生效没有（在已 clone 的仓库内执行）
+git push origin main
+```
+
+### 第 3 步：按现象对症处理
+
+| 现象（关键词） | 原因 | 处理 |
+| --- | --- | --- |
+| `Connection was reset` / `Failed to connect` / 超时（`github.com:443`） | **网络受限**，与权限无关 | 改走 SSH 443 通道（见第 4 步）；HTTPS 在此网络下不可用 |
+| `Permission to LiChenxin0415/TLCodingCompetition.git denied to <用户名>`（403） | 邀请未接受，或用错了账号 / 令牌 | 回第 1 步；核对报错里的用户名是否就是被邀请的人 |
+| `Permission denied (publickey)` | SSH 公钥没加到**自己的** GitHub 账号 | 把 `id_ed25519.pub` 加到 GitHub → Settings → SSH and GPG keys |
+| `! [rejected] main -> main (fetch first)` / `non-fast-forward` | 本地落后于远端（他人已推送） | `git pull --rebase origin main` 后重新 `git push` |
+| `Please tell me who you are` / `unable to auto-detect email address` | 本地没配提交身份（这属于**无法 commit**） | `git config user.name "你的名字"` + `git config user.email "你的邮箱"` |
+| `GH007: Your push would publish a private email address` | 账号开启了邮箱隐私保护 | 把 `user.email` 改为 GitHub 的 `xxxx@users.noreply.github.com` 后重新提交 |
+| `Authentication failed` / 要求输入密码（HTTPS） | GitHub 已不支持账号密码 | 用 Personal Access Token 作为密码（见第 5 步） |
+| `fatal: not a git repository` | 不在仓库目录里执行 | `cd` 到仓库根目录再执行 |
+
+### 第 4 步（受限网络推荐）：用 SSH over 443 接入
+
+```powershell
+# 1) 生成自己的密钥（已有可跳过）
+ssh-keygen -t ed25519 -C "你的邮箱"
+
+# 2) 复制公钥内容，加到 GitHub → Settings → SSH and GPG keys → New SSH key
+Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub
+
+# 3) 验证（Windows 下请用原生 ssh，不要用 git 自带的 ssh）
+& "C:/Windows/System32/OpenSSH/ssh.exe" -T -p 443 git@ssh.github.com
+#    期望输出：Hi <你的用户名>! You've successfully authenticated...
+
+# 4) 克隆与推送都走 443 通道
+$env:GIT_SSH_COMMAND = "C:/Windows/System32/OpenSSH/ssh.exe"
+git clone ssh://git@ssh.github.com:443/LiChenxin0415/TLCodingCompetition.git
+cd TLCodingCompetition
+git config core.sshCommand "C:/Windows/System32/OpenSSH/ssh.exe"
+```
+
+> 每个新终端会话都要先设一次 `GIT_SSH_COMMAND`（原因见第四章）。
+
+### 第 5 步（HTTPS 方式，仅当网络正常时）
+
+1. GitHub → Settings → Developer settings → Personal access tokens 生成令牌
+   （classic 勾选 `repo`；fine-grained 选择本仓库并给 `Contents: Read and write`）。
+2. 把远程地址改为 HTTPS，并把**令牌当作密码**输入：
+   ```powershell
+   git remote set-url origin https://github.com/LiChenxin0415/TLCodingCompetition.git
+   git push origin main
+   ```
+3. 若报 `GH007`，按第 3 步改 `user.email` 为 noreply 邮箱后重试。
+
+---
+
+## 七、待补充（随项目推进更新）
 
 - [ ] 项目业务背景与竞赛题目说明
 - [ ] 前端技术栈与启动方式（补充到 `front/README.md`）
