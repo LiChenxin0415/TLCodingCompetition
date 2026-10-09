@@ -13,6 +13,7 @@ git pull --rebase origin main
 
 - 不允许跳过；不允许在未拉取的情况下编辑文件。
 - 出现冲突先解决冲突，再开始自己的任务。
+- 若因本地未提交改动被拒绝，使用 `git pull --rebase --autostash origin main`。
 
 ## 2. 定时推送成果
 

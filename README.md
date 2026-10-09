@@ -41,6 +41,8 @@ git pull --rebase origin main
 
 - 不允许跳过这一步直接编辑文件。
 - 如果 `pull` 出现冲突，**先解决冲突**，解决完再开始自己的开发。
+- 如果本地已有未提交改动导致 `pull` 被拒绝（`cannot pull with rebase: You have unstaged changes`），
+  使用自动暂存模式：`git pull --rebase --autostash origin main`。（正常流程下应先提交再拉取。）
 
 ### 2. 小步提交，定时推送
 - 每完成一个**可自洽的小任务**（一个接口、一个页面、一份文档）就立即提交并推送，不要攒一大批改动。
