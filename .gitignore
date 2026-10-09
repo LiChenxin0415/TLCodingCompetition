@@ -1,0 +1,66 @@
+# ===== 通用 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+*.tmp
+*.bak
+.idea/
+.vscode/
+*.swp
+
+# ===== 环境变量与密钥（严禁提交）=====
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.jks
+secrets.*
+
+# ===== 前端 =====
+node_modules/
+dist/
+build/
+out/
+.next/
+.nuxt/
+coverage/
+*.tsbuildinfo
+.pnpm-store/
+.vite/
+
+# ===== 后端 / Java =====
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+*.war
+.gradle/
+gradle-app.setting
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# ===== 其他语言 =====
+bin/
+obj/
+*.o
+*.so
+*.dll
+*.exe
+
+# ===== 大文件（设计源文件请用网盘链接）=====
+*.psd
+*.ai
+*.zip
+*.rar
+*.7z
+*.mp4
