@@ -299,7 +299,8 @@ git config core.sshCommand "C:/Windows/System32/OpenSSH/ssh.exe"
 > 需求与设计的权威来源见 `需求文档/` 与 `material/`。
 
 - [x] **项目业务背景与竞赛题目说明**：`需求文档/AI智能周报系统需求文档V2.0 副本.docx`
-- [x] **前端技术栈（设计层）**：`material/design/frontend-design-v1.md`（落地到 `front/README.md` 待前端智能体补充）
+- [x] **前端技术栈（设计层）**：`material/design/frontend-design-v1.md`
+- [x] **前端已实现并验证**：代码位于 `front/`，启动方式/页面清单/交互规则见 `front/README.md`
 - [x] **后端技术栈、数据库（设计层）**：`material/design/backend-design-v1.md`
 - [x] **后端已实现并验证**：代码位于 `back/`，启动方式/接口清单/落地差异见 `back/README.md`
 - [x] **接口文档地址与联调环境**：`material/design/api-spec-v1.md`（冻结契约，前端 Mock 先行）
@@ -329,3 +330,13 @@ material/
   或 `AI_ENABLED=false` 直接走降级模式（GEN-07）。
 - **测试智能体**：`back/npm run smoke` 已覆盖 42 项规则断言（AUTH/GEN/REP/LEAD/OVR + 错误码），
   可直接作为回归基线；`material/requirements/test-cases-v1.md` 中标 `[API]` 的用例可在上述地址执行。
+
+### 前端就绪状态（2026-10，前后端已联通）
+
+- **访问地址**：`http://localhost:5173`，启动：`cd front && npm install && npm run dev`（需先启动后端）
+- **已完成**：P1 登录 / P2 周报编辑（AI 生成 + 降级）/ P3 我的周报 / P4 成员管理（代编辑）/ P5 团队总览（AI 汇总 + 复制 + 导出），
+  含路由守卫（未登录跳登录、成员访问负责人页拦截）、完整空态/加载态/错误态、未保存离开确认。
+- **联调方式**：前端 `/api` 由 Vite 代理到后端 `127.0.0.1:3000`，浏览器只访问 5173，无跨域问题。
+- **验证记录**：typecheck 0 错误、`vite build` 成功（1493 模块）、接口经前端代理回归 **42/42 通过**。
+- **测试智能体**：可直接用 `http://localhost:5173` 做界面级走查；`material/requirements/test-cases-v1.md`
+  中的 LOGIN/TPL/GEN/REP/LEAD/OVR 用例均已具备可点击的页面入口。

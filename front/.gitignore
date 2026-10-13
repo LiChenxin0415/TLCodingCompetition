@@ -1,0 +1,7 @@
+# 前端本地文件（不入库）
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.npm-cache/
