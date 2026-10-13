@@ -294,10 +294,24 @@ git config core.sshCommand "C:/Windows/System32/OpenSSH/ssh.exe"
 
 ---
 
-## 七、待补充（随项目推进更新）
+## 七、资料与进度（随项目推进更新）
 
-- [ ] 项目业务背景与竞赛题目说明
-- [ ] 前端技术栈与启动方式（补充到 `front/README.md`）
-- [ ] 后端技术栈、数据库与启动方式（补充到 `back/README.md`）
-- [ ] 接口文档地址与联调环境
-- [ ] 各智能体职责分工清单
+> 需求与设计的权威来源见 `需求文档/` 与 `material/`。
+
+- [x] **项目业务背景与竞赛题目说明**：`需求文档/AI智能周报系统需求文档V2.0 副本.docx`
+- [x] **前端技术栈（设计层）**：`material/design/frontend-design-v1.md`（落地到 `front/README.md` 待前端智能体补充）
+- [x] **后端技术栈、数据库（设计层）**：`material/design/backend-design-v1.md`（落地到 `back/README.md` 待后端智能体补充）
+- [x] **接口文档地址与联调环境**：`material/design/api-spec-v1.md`（冻结契约，前端 Mock 先行）
+- [x] **各智能体职责分工清单**：需求文档第十一章 / `material/meeting/adr-tech-stack-v1.md`
+- [x] **演示种子数据**：`material/design/demo-data-seed-v1.md`
+- [x] **UI 设计令牌与三态规范**：`material/ui/ui-design-v1.md`
+- [x] **测试用例映射**：`material/requirements/test-cases-v1.md`
+
+### 目录约定补充（material/ 已落地）
+```
+material/
+├── requirements/   # 业需索引 + 测试用例（test-cases-v1.md）
+├── design/         # 前端概设 / 后端概设 / 接口契约 / 种子数据
+├── ui/             # UI 设计（ui-design-v1.md）
+└── meeting/        # ADR（adr-tech-stack-v1.md）
+```
