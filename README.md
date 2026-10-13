@@ -300,7 +300,8 @@ git config core.sshCommand "C:/Windows/System32/OpenSSH/ssh.exe"
 
 - [x] **项目业务背景与竞赛题目说明**：`需求文档/AI智能周报系统需求文档V2.0 副本.docx`
 - [x] **前端技术栈（设计层）**：`material/design/frontend-design-v1.md`（落地到 `front/README.md` 待前端智能体补充）
-- [x] **后端技术栈、数据库（设计层）**：`material/design/backend-design-v1.md`（落地到 `back/README.md` 待后端智能体补充）
+- [x] **后端技术栈、数据库（设计层）**：`material/design/backend-design-v1.md`
+- [x] **后端已实现并验证**：代码位于 `back/`，启动方式/接口清单/落地差异见 `back/README.md`
 - [x] **接口文档地址与联调环境**：`material/design/api-spec-v1.md`（冻结契约，前端 Mock 先行）
 - [x] **各智能体职责分工清单**：需求文档第十一章 / `material/meeting/adr-tech-stack-v1.md`
 - [x] **演示种子数据**：`material/design/demo-data-seed-v1.md`
@@ -315,3 +316,16 @@ material/
 ├── ui/             # UI 设计（ui-design-v1.md）
 └── meeting/        # ADR（adr-tech-stack-v1.md）
 ```
+
+### 后端就绪状态（2026-10，供前端 / 测试智能体使用）
+
+- **联调地址**：`http://localhost:3000/api`，启动：`cd back && npm install && npm start`（需 Node ≥ 24）
+- **已完成**：`api-spec-v1.md` 的 10 个契约接口全部实现，权限隔离（AUTH-01/02/03）、状态机（REP-01/02/03）、
+  负责人代编辑（LEAD-03）、团队总览（OVR-01）、AI 生成/汇总/导出与降级（GEN/OVR）均已冒烟验证通过。
+- **前端必读（契约之外仅新增两个只读接口，不破坏冻结契约）**：
+  - `GET /api/health` → 返回服务端权威**当前周次**（页头「本周周报 · 2026-W42」可取此处）与 AI 状态
+  - `GET /api/login/accounts` → 登录页 4 个预置账号卡片数据（LOGIN-01），避免前端硬编码
+- **无 AI Key 也能演示**：`npm run mock:llm`（本地 Mock，3021 端口）后把后端 `LLM_BASE_URL` 指过去；
+  或 `AI_ENABLED=false` 直接走降级模式（GEN-07）。
+- **测试智能体**：`back/npm run smoke` 已覆盖 42 项规则断言（AUTH/GEN/REP/LEAD/OVR + 错误码），
+  可直接作为回归基线；`material/requirements/test-cases-v1.md` 中标 `[API]` 的用例可在上述地址执行。
