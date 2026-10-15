@@ -2,7 +2,23 @@
 
 本目录存放本项目的**后端工程代码**，由后端相关智能体负责维护。
 
-> **当前状态：空目录（仅本 README 占位）**，后端脚手架尚未创建。
+> **当前状态：已实现并验证** ——《目标合约通》后端已按 `material/design/HLD-目标合约通-v1.0.md` 落地，
+> 11 张表 / 8 个 service / 全部接口（P0/P1/P2）、AI 四能力接 DeepSeek（外网）+ 降级、7 账号种子数据；
+> `typecheck` 0 错误、冒烟 **24/24 通过**、AI 真实调用验证通过。
+
+## 快速开始
+
+```bash
+cd back
+npm install                     # 首次安装（.npmrc 已把缓存指到 .npm-cache）
+cp .env.example .env            # 填 LLM_API_KEY 即可启用外网 AI；不填则降级
+npm start                       # http://localhost:3000/api
+npm run smoke                   # 冒烟测试（需服务已启动）
+npm run mock:llm                # 本地 Mock LLM（断网演示 AI 链路）
+```
+
+- 接口契约、数据模型、核心算法见 `material/design/HLD-目标合约通-v1.0.md`（§5 数据模型 / §7 接口 / §8 规则 / §9 AI）。
+- 鉴权：免密登录 `POST /api/login`；三角色 employee / leader / center，行级权限由服务端强制。
 
 ---
 
