@@ -1,6 +1,0 @@
-# 后端本地文件（不入库）
-node_modules/
-data/
-.env
-*.log
-.npm-cache/
