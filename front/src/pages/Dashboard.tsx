@@ -59,13 +59,13 @@ export default function Dashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setOverview(await getOverview(month, groupId, level));
+      setOverview(await getOverview(month, groupId, level, personId));
     } catch (e) {
       message.error(toUserMessage(e));
     } finally {
       setLoading(false);
     }
-  }, [month, groupId, level]);
+  }, [month, groupId, level, personId]);
 
   useEffect(() => {
     void load();

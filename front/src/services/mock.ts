@@ -985,13 +985,23 @@ export const mockDrilldown = (
 
 /* ---------------- 驾驶舱聚合（FR-05 + FR-04 R4 + FR-09 R5） ---------------- */
 
-export const mockOverview = (month: string, groupId = 'all', level: DrillLevel = 'center'): Promise<DashboardOverview> =>
+export const mockOverview = (
+  month: string,
+  groupId = 'all',
+  level: DrillLevel = 'center',
+  personId = 'all',
+): Promise<DashboardOverview> =>
   call<DashboardOverview>(() => {
     const u = currentUser();
     const groupName = groupId === 'all' ? '全中心' : (db.groups.find((g) => g.id === groupId)?.name ?? groupId);
-    const contracts = scopedContracts(month, u, groupId);
-    const memberIds = [...new Set(contracts.map((c) => c.user_id))];
-    const rows = monthItemRows(month, u, groupId);
+    const allContracts = scopedContracts(month, u, groupId);
+    const allMemberIds = [...new Set(allContracts.map((c) => c.user_id))];
+    const allRows = monthItemRows(month, u, groupId);
+    // 个人级：把整个驾驶舱收敛到某一个人（FR-05 R1 三级视角）
+    const focusId = level === 'person' && personId !== 'all' ? personId : null;
+    const rows = focusId ? allRows.filter((r) => r.user_id === focusId) : allRows;
+    const memberIds = focusId ? allMemberIds.filter((id) => id === focusId) : allMemberIds;
+    const contracts = focusId ? allContracts.filter((c) => c.user_id === focusId) : allContracts;
 
     /* 1) 大目标：实时重算加权进度 + 贡献占比（FR-04 R3/R4） */
     recomputeObjectives();
@@ -1088,37 +1098,27 @@ export const mockOverview = (month: string, groupId = 'all', level: DrillLevel =
       color: t.max < 80 ? '#cf1322' : t.max < 100 ? '#fa8c16' : t.max === 100 ? '#1677ff' : '#52c41a',
     }));
 
-    /* 6) 发布前置校验三项（FR-09 R5） */
-    const weightIssues = memberIds.filter((uid) => {
-      const c = contracts.find((x) => x.user_id === uid);
-      return c ? sumWeight(itemsOf(c.id)) !== 100 : false;
-    });
-    const unconfirmed = contracts.filter((c) => c.status !== 'confirmed' && c.status !== 'rated' && c.status !== 'published');
-    const dueIssues = rows.filter((r) => dayjs(r.due_date).format('YYYY-MM') !== month);
+    /* 6) 发布前置校验三项（FR-09 R5）—— 直接复用「确认发布」的同一份校验实现 */
+    const flagged = contracts.flatMap((c) => publishIssuesFor(c).map((issue) => ({ c, issue })));
+    const summary = (category: CheckCategory, okDetail: string) => {
+      const hit = flagged.filter((x) => x.issue.category === category);
+      if (!hit.length) return { passed: true, detail: okDetail };
+      const who = [...new Set(hit.map((x) => db.users.find((p) => p.id === x.c.user_id)?.name ?? x.c.user_id))];
+      const msg = [...new Set(hit.map((x) => x.issue.message))].join('；');
+      return { passed: false, detail: `${who.length} 人待处理（${who.join('、')}）：${msg}` };
+    };
+    const cWeight = summary('weight', '全部合约权重合计均为 100%');
+    const cConfirm = summary('confirm', '合约已核对且工作包评分齐全');
+    const cAbnormal = summary('abnormal', '无录入异常项');
     const readiness: PublishReadiness = {
-      ok: weightIssues.length === 0 && unconfirmed.length === 0 && dueIssues.length === 0,
+      ok: cWeight.passed && cConfirm.passed && cAbnormal.passed,
       month,
       total_contract: contracts.length,
       published_count: contracts.filter((c) => c.status === 'published').length,
       checks: [
-        {
-          key: 'weight', label: '有效任务权重合计 = 100%', passed: weightIssues.length === 0,
-          detail: weightIssues.length
-            ? `${weightIssues.length} 人权重合计 ≠ 100%：${weightIssues.map((id) => db.users.find((x) => x.id === id)?.name).join('、')}`
-            : '全部合约权重校验通过',
-        },
-        {
-          key: 'confirmed', label: '合约与评分全部确认完成', passed: unconfirmed.length === 0,
-          detail: unconfirmed.length
-            ? `${unconfirmed.length} 份合约尚未完成核对/评分`
-            : '全部合约已完成核对与评分',
-        },
-        {
-          key: 'abnormal', label: '无录入异常（权重/日期/交付物）', passed: dueIssues.length === 0,
-          detail: dueIssues.length
-            ? `${dueIssues.length} 个工作包截止日不在合约月份内`
-            : '无录入异常项',
-        },
+        { key: 'weight', label: '有效任务权重合计 = 100%', ...cWeight },
+        { key: 'confirmed', label: '合约与评分全部确认完成', ...cConfirm },
+        { key: 'abnormal', label: '无录入异常（权重/日期/交付物）', ...cAbnormal },
       ],
     };
 

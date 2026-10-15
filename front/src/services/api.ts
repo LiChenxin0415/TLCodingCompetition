@@ -162,8 +162,15 @@ export const getDrilldown = (
     : get<DrilldownRow[]>('/dashboard/drilldown', { metric, month, group: groupId, level, person: personId });
 
 /** 驾驶舱聚合视图：一次请求取回首屏所需全部数据（FR-05 / FR-04 R4 / FR-09 R5） */
-export const getOverview = (month: string, groupId = 'all', level: DrillLevel = 'center'): Promise<DashboardOverview> =>
-  USE_MOCK ? mock.mockOverview(month, groupId, level) : get<DashboardOverview>('/dashboard/overview', { month, group: groupId, level });
+export const getOverview = (
+  month: string,
+  groupId = 'all',
+  level: DrillLevel = 'center',
+  personId = 'all',
+): Promise<DashboardOverview> =>
+  USE_MOCK
+    ? mock.mockOverview(month, groupId, level, personId)
+    : get<DashboardOverview>('/dashboard/overview', { month, group: groupId, level, person: personId });
 
 /* ---------------- 日报周报（FR-07） ---------------- */
 
