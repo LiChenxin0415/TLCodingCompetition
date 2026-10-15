@@ -158,7 +158,10 @@ export default function Dashboard() {
             <Radio.Group
               size="small"
               value={level}
-              onChange={(e) => setLevel(e.target.value)}
+              onChange={(e) => {
+                setLevel(e.target.value);
+                if (e.target.value !== 'person') setPersonId('all');
+              }}
               optionType="button"
               options={[
                 { label: '中心级', value: 'center' },
@@ -166,6 +169,19 @@ export default function Dashboard() {
                 { label: '个人级', value: 'person' },
               ]}
             />
+            {level === 'person' && (
+              <Select
+                size="small"
+                style={{ width: 130 }}
+                value={personId}
+                onChange={setPersonId}
+                placeholder="选择成员"
+                options={[
+                  { value: 'all', label: '全部成员' },
+                  ...(overview?.persons ?? []).map((p) => ({ value: p.user_id, label: p.user_name })),
+                ]}
+              />
+            )}
             <Button size="small" onClick={() => void load()} loading={loading}>刷新</Button>
             <Button size="small" onClick={() => void handleExport()}>导出台账</Button>
           </Space>
