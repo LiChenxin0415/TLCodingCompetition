@@ -919,8 +919,9 @@ export const mockMetrics = (month: string, groupId = 'all'): Promise<MetricCard[
         caption: `完成率 ${pct(doneCount, rows.length)}%`, tone: 'success', drillable: true,
       },
       {
-        key: 'published', label: '已发布绩效', value: published, suffix: '人',
-        caption: `本月共 ${scopedContracts(month, u, groupId).length} 份合约`, tone: 'default', drillable: true,
+        key: 'published', label: '已发布绩效', value: publishedRows(rows, month, u, groupId).length, suffix: '个',
+        caption: `覆盖 ${published} 人 · 本月共 ${scopedContracts(month, u, groupId).length} 份合约`,
+        tone: 'default', drillable: true,
       },
       {
         key: 'avgScore', label: '平均履约得分', value: avg(scored), suffix: '分',
@@ -932,6 +933,24 @@ export const mockMetrics = (month: string, groupId = 'all'): Promise<MetricCard[
       },
     ];
   }, 300);
+
+/** 已发布合约的 id 集合（行级权限内） */
+const publishedContractIds = (month: string, u: User, groupId = 'all') =>
+  new Set(scopedContracts(month, u, groupId).filter((c) => c.status === 'published').map((c) => c.id));
+
+/**
+ * 已发布绩效的工作包明细。
+ * 指标卡与下钻共用本函数，确保「卡上的数字 = 点开的条数」（FR-05 R5）。
+ */
+const publishedRows = (rows: DrilldownRow[], month: string, u: User, groupId = 'all') => {
+  const ids = publishedContractIds(month, u, groupId);
+  return rows
+    .filter((r) => {
+      const it = db.items.find((x) => x.id === r.id);
+      return it ? ids.has(it.contract_id) : false;
+    })
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+};
 
 /** 下钻：支持中心/组/个人三级（FR-05 R1），并在 metric 维度上做确定性过滤（R5 条数一致） */
 export const mockDrilldown = (
@@ -962,18 +981,9 @@ export const mockDrilldown = (
       case 'done':
         rows = rows.filter((r) => r.progress >= 100).sort((a, b) => b.due_date.localeCompare(a.due_date));
         break;
-      case 'published': {
-        const publishedIds = new Set(
-          scopedContracts(month, u, groupId).filter((c) => c.status === 'published').map((c) => c.id),
-        );
-        rows = rows
-          .filter((r) => {
-            const it = db.items.find((x) => x.id === r.id);
-            return it ? publishedIds.has(it.contract_id) : false;
-          })
-          .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+      case 'published':
+        rows = publishedRows(rows, month, u, groupId);
         break;
-      }
       case 'total':
         rows = rows.sort((a, b) => a.due_date.localeCompare(b.due_date));
         break;
@@ -1122,11 +1132,14 @@ export const mockOverview = (
       ],
     };
 
-    /* 7) 风险：TOP5 仅用于展示，指标卡必须取全量计数以保证「卡上的数字 = 下钻明细条数」（FR-05 R5） */
+    /* 7) 风险 TOP5（展示用）与全量计数（指标卡用，FR-05 R5） */
     const riskAll = rows
       .filter((r) => r.risk_status !== '正常')
       .sort((a, b) => (a.risk_status === '逾期' ? 0 : 1) - (b.risk_status === '逾期' ? 0 : 1));
     const risk_top = riskAll.slice(0, 5);
+
+    /* 已发布绩效明细：与下钻共用口径 */
+    const publishedList = publishedRows(rows, month, u, groupId);
 
     const metrics: MetricCard[] = [
       {
@@ -1143,8 +1156,10 @@ export const mockOverview = (
         caption: `完成率 ${pct(rows.filter((r) => r.progress >= 100).length, rows.length)}%`, tone: 'success', drillable: true,
       },
       {
-        key: 'published', label: '已发布绩效', value: readiness.published_count, suffix: '人',
-        caption: `本月共 ${contracts.length} 份合约`, tone: 'default', drillable: true,
+        // 与下钻共用同一口径，保证「卡上的数字 = 点开的条数」（FR-05 R5）
+        key: 'published', label: '已发布绩效', value: publishedList.length, suffix: '个',
+        caption: `覆盖 ${readiness.published_count} 人 · 本月共 ${contracts.length} 份合约`,
+        tone: 'default', drillable: true,
       },
       {
         key: 'avgScore', label: '平均履约得分', value: avg(scoredRows.map((r) => r.score as number)), suffix: '分',
