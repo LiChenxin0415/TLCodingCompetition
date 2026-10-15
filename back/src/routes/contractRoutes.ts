@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth, requireRole, authedUser } from '../middleware/auth.ts';
-import { getContractForUser, getOrCreateContract, listTeamContracts, reviewContract, saveItems, submitContract } from '../services/contractService.ts';
+import { getContractForUser, getMyContractByMonth, getOrCreateContract, listMyContracts, listTeamContracts, reviewContract, saveItems, submitContract } from '../services/contractService.ts';
 import { resolveMonth } from '../utils/month.ts';
 
 const router = Router();
@@ -9,9 +9,13 @@ router.use(requireAuth);
 router.get('/mine', (req, res) => {
   const user = authedUser(req);
   const month = resolveMonth(req.query.month);
-  const contract = getOrCreateContract(user, month);
-  const { items } = getContractForUser(user, contract.id);
+  const contract = getMyContractByMonth(user, month);
+  const items = contract === null ? [] : getContractForUser(user, contract.id).items;
   res.json({ contract, items });
+});
+
+router.get('/mine/history', (req, res) => {
+  res.json(listMyContracts(authedUser(req)));
 });
 
 router.post('/', (req, res) => {

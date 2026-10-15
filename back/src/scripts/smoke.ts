@@ -46,7 +46,7 @@ async function main(): Promise<void> {
   check('ROLE', 'dept01 为 center（部门负责人）', dept.data.user.role === 'center');
 
   const accounts = await call('GET', '/accounts');
-  check('ACCOUNTS', '返回 7 个预置账号', accounts.status === 200 && accounts.data?.accounts?.length === 7, 'len=' + accounts.data?.accounts?.length);
+  check('ACCOUNTS', '返回 8 个预置账号', accounts.status === 200 && accounts.data?.accounts?.length === 8, 'len=' + accounts.data?.accounts?.length);
 
   section('二、合约与工作包（种子数据）');
   const mine = await call('GET', '/contracts/mine', { token: t1 });
@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   const objs = await call('GET', '/objectives', { token: td });
   check('OBJECTIVE', '组长可见大目标', objs.status === 200 && Array.isArray(objs.data) && objs.data.length >= 2);
   const detail = await call('GET', '/objectives/obj_001', { token: tl });
-  check('OBJ-PROG', 'obj_001 加权进度 = 67.5', detail.status === 200 && detail.data?.progress === 67.5, 'progress=' + detail.data?.progress);
+  check('OBJ-PROG', 'obj_001 加权进度 = 87.1', detail.status === 200 && detail.data?.progress === 87.1, 'progress=' + detail.data?.progress);
 
   section('四、AI（DeepSeek / 降级，容忍 200 或 504）');
   const gen = await call('POST', '/ai/contracts/generate', { token: t1, body: { desc: '这个月主要搞慢SQL治理和AB需求，再保证生产稳定' } });

@@ -24,7 +24,8 @@ export function createObjective(user: AuthUser, body: Record<string, unknown>): 
     ownerId: typeof body.owner_id === 'string' ? body.owner_id : user.id,
     startDate: String(body.start_date ?? ''),
     endDate: String(body.end_date ?? ''),
-    status: typeof body.status === 'string' ? body.status : '进行中',
+    status: typeof body.status === 'string' && body.status.trim() !== '' ? body.status : '进行中',
+    isKey: body.is_key === 1 || body.is_key === true ? 1 : 0,
   };
   objRepo.insertObjective(getDb(), objective);
   return objective;
@@ -42,6 +43,7 @@ export function updateObjective(user: AuthUser, id: string, body: Record<string,
     startDate: String(body.start_date ?? existing.startDate),
     endDate: String(body.end_date ?? existing.endDate),
     status: String(body.status ?? existing.status),
+    isKey: body.is_key !== undefined ? (body.is_key === 1 || body.is_key === true ? 1 : 0) : existing.isKey,
   };
   objRepo.updateObjective(getDb(), objective);
   return objective;

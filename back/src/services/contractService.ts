@@ -24,6 +24,16 @@ export function getOrCreateContract(user: AuthUser, month: string): Contract {
   return contract;
 }
 
+/** 查看本人某月合约（不自动创建；无则返回 null，供历史查看空态） */
+export function getMyContractByMonth(user: AuthUser, month: string): Contract | null {
+  return repo.findContractByUserMonth(getDb(), user.id, month);
+}
+
+/** 本人全部合约（按月倒序，供月份选择与跨月对比） */
+export function listMyContracts(user: AuthUser): Contract[] {
+  return repo.listContractsByUser(getDb(), user.id);
+}
+
 export function getContractForUser(user: AuthUser, contractId: string): { contract: Contract; items: ContractItem[] } {
   const contract = repo.findContract(getDb(), contractId);
   if (contract === null) throw notFound('合约不存在');
@@ -71,6 +81,7 @@ export function saveItems(user: AuthUser, contractId: string, rawItems: unknown)
       source: r.source === 'AI' ? 'AI' : 'manual',
       checked: 0,
       score: null,
+      valueTag: typeof r.value_tag === 'string' && r.value_tag !== '' ? r.value_tag : null,
     };
     items.push(item);
     repo.insertItem(db, item);

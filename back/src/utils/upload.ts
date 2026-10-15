@@ -2,7 +2,7 @@ import multer from 'multer';
 import path from 'node:path';
 import fs from 'node:fs';
 import { config } from '../config.ts';
-import { badRequest } from './errors.ts';
+import { badRequest, ApiError } from './errors.ts';
 
 export const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'png', 'jpg', 'zip', 'md', 'txt'];
 const MAX_FILE_MB = 50; // 交付物 ≤50MB（PRD FR-03 R2）
@@ -45,9 +45,9 @@ export const reportUpload = multer({
   fileFilter: fileFilter(['pdf', 'docx', 'xlsx', 'png', 'jpg', 'md', 'txt']),
 });
 
-export function multerErrorToApi(error: unknown): never {
+export function multerErrorToApi(error: unknown): ApiError {
   const anyError = error as { code?: string; message?: string };
-  if (anyError?.code === 'LIMIT_FILE_SIZE') throw badRequest('文件大小超过限制');
-  if (anyError?.message === 'FILE_TYPE_NOT_ALLOWED') throw badRequest('文件类型不支持');
-  throw badRequest('文件上传失败');
+  if (anyError?.code === 'LIMIT_FILE_SIZE') return badRequest('文件大小超过限制');
+  if (anyError?.message === 'FILE_TYPE_NOT_ALLOWED') return badRequest('文件类型不支持');
+  return badRequest('文件上传失败');
 }

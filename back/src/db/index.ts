@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS objectives (
   owner_id   TEXT REFERENCES users(id),
   start_date TEXT NOT NULL,
   end_date   TEXT NOT NULL,
-  status     TEXT NOT NULL CHECK (status IN ('进行中','已达成','已关闭'))
+  status     TEXT NOT NULL CHECK (status IN ('进行中','已达成','已关闭')),
+  is_key     INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS contracts (
@@ -60,7 +61,8 @@ CREATE TABLE IF NOT EXISTS contract_items (
   progress         INTEGER NOT NULL DEFAULT 0,
   source           TEXT NOT NULL DEFAULT 'manual',
   checked          INTEGER NOT NULL DEFAULT 0,
-  score            INTEGER
+  score            INTEGER,
+  value_tag        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_items_contract  ON contract_items (contract_id);
 CREATE INDEX IF NOT EXISTS idx_items_objective ON contract_items (objective_id);
@@ -131,6 +133,19 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 let db: DatabaseSync | null = null;
 
+function ensureColumn(database: DatabaseSync, table: string, column: string, ddl: string): void {
+  const cols = database.prepare(`PRAGMA table_info(${table})`).all() as unknown as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === column)) {
+    database.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+  }
+}
+
+/** 增量迁移：为已存在的数据库文件补齐 FR-10 新增列（幂等） */
+function migrate(database: DatabaseSync): void {
+  ensureColumn(database, 'objectives', 'is_key', 'is_key INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(database, 'contract_items', 'value_tag', 'value_tag TEXT');
+}
+
 export function getDb(): DatabaseSync {
   if (db !== null) return db;
   const file = resolveDbFile();
@@ -139,6 +154,7 @@ export function getDb(): DatabaseSync {
   opened.exec('PRAGMA journal_mode = WAL;');
   opened.exec('PRAGMA foreign_keys = ON;');
   opened.exec(SCHEMA);
+  migrate(opened);
   db = opened;
   return db;
 }

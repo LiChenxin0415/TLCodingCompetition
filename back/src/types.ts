@@ -27,6 +27,7 @@ export interface Objective {
   startDate: string;
   endDate: string;
   status: string;
+  isKey: number;
 }
 
 export interface Contract {
@@ -55,6 +56,7 @@ export interface ContractItem {
   source: 'manual' | 'AI';
   checked: number;
   score: number | null;
+  valueTag: string | null;
 }
 
 export interface Deliverable {
