@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Col, DatePicker, Radio, Row, Space, Spin, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, DatePicker, Radio, Row, Select, Space, Spin, Tag, Tooltip, Typography, message } from 'antd';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import DistributePanel from '@/components/dashboard/DistributePanel';
@@ -178,7 +178,7 @@ export default function Dashboard() {
                 placeholder="选择成员"
                 options={[
                   { value: 'all', label: '全部成员' },
-                  ...(overview?.persons ?? []).map((p) => ({ value: p.user_id, label: p.user_name })),
+                  ...(overview?.person_options ?? []).map((p) => ({ value: p.user_id, label: p.user_name })),
                 ]}
               />
             )}
