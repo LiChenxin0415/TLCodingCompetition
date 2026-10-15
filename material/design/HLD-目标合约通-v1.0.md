@@ -288,7 +288,25 @@ confirmed ──月末评分完成──▶ rated ──中心校准──▶ pu
 
 ## 9. AI 服务设计（对齐 PRD §11）
 
-- **统一适配**：`ai/llmClient.ts` 负责 OpenAI 兼容调用、`AbortController` 超时（进度解析 5s / 合约生成 8s）、备用端点 fallback、`AI_ENABLED=false` 或未配置时降级。
+### 9.1 LLM 端点（已确认，实测可用）
+
+| 项 | 值 |
+| --- | --- |
+| 提供方 | DeepSeek 官方（外网） |
+| Base URL | `https://api.deepseek.com`（直连可达，实测 0.1s；`/v1` 路径亦可用） |
+| 模型 | `deepseek-v4-flash`（服务端规范名 `deepseek-flash`） |
+| 密钥 | 本地 `back/.env` 的 `LLM_API_KEY`，**严禁入库**（已被 `.gitignore` 忽略） |
+| 实测结果 | HTTP 200，响应含 `reasoning_content`（推理型模型） |
+
+**推理型模型注意（实测结论，实现时直接采用）**：
+
+- 响应体同时含 `reasoning_content`（推理过程）与 `content`（最终答案）——**只读 `choices[0].message.content`**。
+- 推理先消耗 token，`max_tokens` 要给足（合约生成建议 ≥4096），否则 `content` 可能为空（`finish_reason=length`）。
+- 时延：flash 为快速档但推理型仍偏慢；PRD 的 5s/8s 超时若实测偏紧，放宽到 15–20s，超时仍走降级兜底。
+
+### 9.2 设计要点
+
+- **统一适配**：`ai/llmClient.ts` 负责 OpenAI 兼容调用、`AbortController` 超时（进度解析 5s / 合约生成 8s，可按 9.1 调宽）、备用端点 fallback、`AI_ENABLED=false` 或未配置时降级。
 - **严格 JSON + schema 校验**：四个能力（合约生成 / 进度解析 / 报表解析 / 能力标签）输出均有 schema，校验失败一律视同失败（不向前端暴露原始报错）。
 - **降级矩阵**：合约生成→模板预填+手工新增；进度解析→手工进度框；报表解析→仅存文件；能力标签→关键词规则；数据核验→"暂无法自动核验"。
 - **人工确认**：解析结果默认人工确认后入库；`confidence ≥ 0.85` 且用户开启"自动采纳"才可跳过（PRD §11 通用约束）。
