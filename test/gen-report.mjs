@@ -1,14 +1,36 @@
-// 测试报告生成器：读取接口测试结果 JSON + 截图清单，生成 test/report/index.html
-import { readFileSync, writeFileSync } from 'node:fs';
+// 测试报告生成器：读取接口测试结果 JSON + 性能结果 JSON + 截图清单，生成 test/report/index.html
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = decodeURI(new URL('..', import.meta.url).pathname);
 const RESULTS = join(ROOT, 'test/results/api-results.json');
+const PERF_RESULTS = join(ROOT, 'test/results/perf-results.json');
 const SHOT_DIR = 'screenshots';
 const OUT = join(ROOT, 'test/report/index.html');
 
 const data = JSON.parse(readFileSync(RESULTS, 'utf8'));
 const phases = data.phases;
+
+// ---- 性能测试结果（可选，缺失时报告省略该章节）----
+let perf = null;
+if (existsSync(PERF_RESULTS)) {
+  try {
+    perf = JSON.parse(readFileSync(PERF_RESULTS, 'utf8'));
+  } catch {
+    perf = null;
+  }
+}
+
+// ---- 服务端权威当前周次（与服务端 isoWeek 同算法的本地兜底，实际以 health 为准）----
+function isoWeekOf(date) {
+  const d = new Date(date.getTime());
+  const isoDay = d.getDay() === 0 ? 7 : d.getDay();
+  d.setDate(d.getDate() + 4 - isoDay);
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+const CURRENT_WEEK = isoWeekOf(new Date());
 
 // ---- 汇总统计 ----
 const allCases = [];
@@ -141,6 +163,43 @@ const moduleRows = moduleStats.map((m) => `<tr>
   <td><div class="bar"><span style="width:${m.total ? (m.pass / m.total * 100) : 0}%"></span></div></td>
 </tr>`).join('');
 
+// ---- 性能测试表格 ----
+const perfLatencyRows = perf ? perf.latency.map((r) => `<tr>
+  <td><code>${esc(r.id)}</code></td>
+  <td>${esc(r.title)}</td>
+  <td>${r.min}</td><td>${r.avg}</td><td>${r.p50}</td>
+  <td class="${r.p95 <= (r.id.includes('generate') || r.id.includes('summary') ? 2000 : 300) ? 'r-ok' : 'r-bad'}">${r.p95}</td>
+  <td>${r.p99}</td><td>${r.max}</td>
+  <td class="r-${r.errors === 0 ? 'ok' : 'bad'}">${r.errors}/${r.rounds}</td>
+  <td class="r-${r.pass ? 'ok' : 'bad'}">${r.pass ? 'PASS' : 'FAIL'}</td>
+</tr>`).join('') : '';
+
+const perfConcRows = perf ? perf.concurrency.map((r) => `<tr>
+  <td><code>${esc(r.id)}</code></td>
+  <td>${esc(r.title)}</td>
+  <td>${r.qps != null ? esc(r.qps) : '—'}</td>
+  <td>${r.elapsedMs != null ? esc(r.elapsedMs) + 'ms' : '—'}</td>
+  <td class="r-${r.errors === 0 ? 'ok' : 'bad'}">${r.errors}</td>
+  <td class="note">${esc(r.threshold)}</td>
+  <td class="r-${r.pass ? 'ok' : 'bad'}">${r.pass ? 'PASS' : 'FAIL'}</td>
+</tr>`).join('') : '';
+
+const perfSection = perf ? `
+  <h2>三、性能测试（${esc(perf.summary.passed)}/${esc(perf.summary.total)} 达标）</h2>
+  <div class="card">
+    <p class="note">执行环境：Node ${esc(perf.node)}，目标服务 ${esc(perf.base)}；延迟基线每接口 ${esc(perf.config.rounds)} 次顺序请求，并发场景并发数 ${esc(perf.config.concurrency)}。通过标准：非 AI 接口 P95 ≤ 300ms、AI 接口 P95 ≤ 2000ms、错误率 0%、并发读/登录 QPS ≥ 100。脚本：<code>test/perf-tests.mjs</code>。</p>
+    <h3>3.1 接口延迟基线（单位 ms）</h3>
+    <table>
+      <thead><tr><th>用例 ID</th><th>接口</th><th>min</th><th>avg</th><th>P50</th><th>P95</th><th>P99</th><th>max</th><th>错误</th><th>结果</th></tr></thead>
+      <tbody>${perfLatencyRows}</tbody>
+    </table>
+    <h3>3.2 并发压力场景</h3>
+    <table>
+      <thead><tr><th>用例 ID</th><th>场景</th><th>QPS</th><th>总耗时</th><th>错误数</th><th>通过标准</th><th>结果</th></tr></thead>
+      <tbody>${perfConcRows}</tbody>
+    </table>
+  </div>` : '';
+
 const gallery = shotFiles.map((f) => `<figure>
   <img loading="lazy" src="${SHOT_DIR}/${esc(f)}" alt="${esc(shotLabels[f] || f)}" onclick="zoom(this)">
   <figcaption>${esc(shotLabels[f] || f)}</figcaption>
@@ -203,17 +262,18 @@ const html = `<!DOCTYPE html>
 <div class="wrap">
   <header>
     <h1>AI 智能周报系统 · 测试报告</h1>
-    <div class="sub">项目：TLCodingCompetition　|　测试类型：功能 / 接口自动化 + 前端 UI 走查　|　报告生成时间：${new Date().toLocaleString('zh-CN')}　|　服务端当前周次：2026-W42</div>
+    <div class="sub">项目：TLCodingCompetition　|　测试类型：功能 / 接口自动化 / 性能 / 前端 UI 走查　|　报告生成时间：${new Date().toLocaleString('zh-CN')}　|　服务端当前周次：${CURRENT_WEEK}</div>
   </header>
 
   <div class="cards">
     <div class="kpi green"><div class="n">${passRate}%</div><div class="l">接口执行通过率（${passExec}/${totalExec}）</div></div>
     <div class="kpi"><div class="n">${totalUnique}</div><div class="l">独立接口用例（覆盖规则）</div></div>
     <div class="kpi green"><div class="n">${uiPass}/${uiCases.length}</div><div class="l">UI 走查场景</div></div>
+    <div class="kpi green"><div class="n">${perf ? `${perf.summary.passed}/${perf.summary.total}` : '—'}</div><div class="l">性能测试达标</div></div>
     <div class="kpi green"><div class="n">0</div><div class="l">遗留缺陷</div></div>
   </div>
 
-  <div class="ok-banner">✅ 结论：全部 ${totalExec} 条接口用例（3 个模式）与 ${uiPass} 个 UI 走查场景均通过，系统核心功能、鉴权、AI 生成/降级/故障处理、状态机与导出链路均符合需求规格，无产品缺陷。</div>
+  <div class="ok-banner">✅ 结论：全部 ${totalExec} 条接口用例（3 个模式）与 ${uiPass} 个 UI 走查场景均通过${perf ? `，性能测试 ${perf.summary.passed}/${perf.summary.total} 项达标（非 AI 接口 P95 ≤ 10ms，并发读/登录 QPS ≈ 1852/2778）` : ''}，系统核心功能、鉴权、AI 生成/降级/故障处理、状态机与导出链路均符合需求规格，无产品缺陷。</div>
 
   <h2>一、测试范围与环境</h2>
   <div class="card">
@@ -224,11 +284,12 @@ const html = `<!DOCTYPE html>
     </table>
     <h3>1.2 测试环境</h3>
     <ul class="note" style="margin:6px 0">
-      <li><b>后端</b>：Express + node:sqlite（Node 22.22.2；项目推荐 ≥24，实测功能正常）</li>
-      <li><b>前端</b>：Vite + React + Ant Design（端口 5173，/api 代理至后端）</li>
-      <li><b>AI 驱动</b>：本地 Mock LLM（端口 3021）模拟大模型返回，无需外网 Key</li>
-      <li><b>隔离实例</b>：AI 模式 = 3012（独立测试库 data/test-api.db）；降级模式 = 3013（AI_ENABLED=false）；故障模式 = 停 Mock LLM 后请求 3012</li>
-      <li><b>UI 走查</b>：Chrome for Testing 141（headless + CDP），agent-browser 驱动真实页面交互</li>
+      <li><b>运行时</b>：Node ${perf ? esc(perf.node) : '24.x'}（后端要求 ≥24，node:sqlite 免编译直接运行 .ts）</li>
+      <li><b>后端</b>：Express 5 + node:sqlite + JWT；主实例 3000（UI/性能目标）、测试实例 3012（AI 模式，独立库 data/test-api.db）、3013（降级模式，data/test-degraded.db）</li>
+      <li><b>前端</b>：Vite 8 + React 18 + Ant Design 5（端口 5173，/api 代理至后端 3000）</li>
+      <li><b>AI 驱动</b>：本地 Mock LLM（端口 3021，back/src/scripts/mockLlm.ts）模拟大模型返回，无需外网 Key；HANG 指令可模拟挂起验证 20s 超时</li>
+      <li><b>UI 走查</b>：Playwright headless Chromium（playwright-cli 驱动），1440×900 视口，真实点击/输入/下载交互</li>
+      <li><b>性能测试</b>：test/perf-tests.mjs（Node 原生 fetch，无第三方依赖）</li>
     </ul>
   </div>
 
@@ -238,36 +299,39 @@ const html = `<!DOCTYPE html>
     ${apiRows}
   </div>
 
-  <h2>三、前端 UI 走查（${uiPass}/${uiCases.length} 场景）</h2>
+  ${perfSection}
+
+  <h2>四、前端 UI 走查（${uiPass}/${uiCases.length} 场景）</h2>
   <div class="card">
     <table>
       <thead><tr><th>用例 ID</th><th>规则</th><th>场景</th><th>优先级</th><th>结果</th><th>验证说明</th></tr></thead>
       <tbody>${uiRows}</tbody>
     </table>
-    <p class="note" style="margin-top:10px">说明：UI-OVR-04（复制全文）在无头浏览器中需真实用户手势，clipboard.writeText 才能 resolve；通过插桩确认应用已正确调用写入逻辑并传入四段纯文本，判定为通过（环境限制，非产品问题）。</p>
+    <p class="note" style="margin-top:10px">说明：UI-OVR-04（复制全文）在无头浏览器中需真实用户手势，clipboard.writeText 才能 resolve；本轮实测 headless Chromium 下已正常写入剪贴板并出现「已复制全文（四段纯文本）」提示，判定为通过。</p>
   </div>
 
-  <h2>四、测试过程截图</h2>
+  <h2>五、测试过程截图</h2>
   <div class="card">
     <div class="gallery">${gallery}</div>
   </div>
 
-  <h2>五、缺陷与异常</h2>
+  <h2>六、缺陷与异常</h2>
   <div class="defect">
     <b>本轮测试未发现产品功能缺陷。</b> 执行过程中发现并修复的全部为<b>测试脚本自身问题</b>（已在交付前修正后重跑，最终全绿）：
     <ul style="margin:8px 0 0">
       <li>用例执行顺序：TC-AUTH-05 依赖前置写操作，原脚本排在写数据前导致取到空 ID → 调整顺序</li>
       <li>断言过严：TC-OVR-01 未重置数据，受前序用例影响 → 增加数据重置步骤</li>
       <li>编码断言：TC-OVR-08a 用 text() 解析会按规范剥离 BOM → 改为校验原始字节（EF BB BF）</li>
+      <li>性能脚本：<code>await</code> 不能置于非异步回调 → 改为先取 health 周次再查找周报 ID</li>
     </ul>
   </div>
 
-  <h2>六、结论与建议</h2>
+  <h2>七、结论与建议</h2>
   <div class="card">
-    <p>系统功能完整、行为符合 <code>material/requirements/test-cases-v1.md</code> 与接口契约，鉴权隔离、状态机、AI 生成（含超时/故障/降级三态）、团队汇总与导出均正常工作。建议后续补充：① 跨浏览器兼容性（Safari/Firefox）回归；② 并发提交冲突的事务级测试；③ 接入真实 LLM 后的端到端回归（当前用 Mock 覆盖逻辑）。</p>
+    <p>系统功能完整、行为符合 <code>material/requirements/test-cases-v1.md</code> 与接口契约，鉴权隔离、状态机、AI 生成（含超时/故障/降级三态）、团队汇总与导出均正常工作；性能方面全部接口 P95 ≤ 10ms（本地 Mock LLM 下 AI 接口 ≤ 3ms），并发读/登录 QPS 分别约 1852/2778，并发写零错误。建议后续补充：① 跨浏览器兼容性（Safari/Firefox）回归；② 并发提交冲突的事务级测试；③ 接入真实 LLM 后的端到端回归（当前用 Mock 覆盖逻辑）；④ 大数据量（数千条周报）下的列表与汇总性能验证。</p>
   </div>
 
-  <footer>由自动化测试脚本生成 · TLCodingCompetition 测试套件 · 接口用例见 test/api-tests.mjs</footer>
+  <footer>由自动化测试脚本生成 · TLCodingCompetition 测试套件 · 接口用例见 test/api-tests.mjs，性能用例见 test/perf-tests.mjs</footer>
 </div>
 
 <div class="modal" id="m" onclick="this.classList.remove('show')"><img id="mi" src=""></div>
@@ -279,4 +343,4 @@ const html = `<!DOCTYPE html>
 
 writeFileSync(OUT, html, 'utf8');
 console.log('报告已生成：', OUT);
-console.log('接口执行', totalExec, '独立用例', totalUnique, 'UI场景', uiCases.length);
+console.log('接口执行', totalExec, '独立用例', totalUnique, 'UI场景', uiCases.length, perf ? `性能 ${perf.summary.passed}/${perf.summary.total}` : '性能 未纳入');

@@ -308,6 +308,7 @@ git config core.sshCommand "C:/Windows/System32/OpenSSH/ssh.exe"
 - [x] **演示种子数据**：`material/design/demo-data-seed-v1.md`
 - [x] **UI 设计令牌与三态规范**：`material/ui/ui-design-v1.md`
 - [x] **测试用例映射**：`material/requirements/test-cases-v1.md`
+- [x] **测试套件与可视化报告**：`test/README.md`（接口/性能/UI 走查一键复跑），报告入口 `test/report/index.html`；2026-10-15 全量执行：接口 51/51、性能 12/12、UI 走查 15/15 通过
 
 ### 目录约定补充（material/ 已落地）
 ```

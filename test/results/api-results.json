@@ -1,9 +1,9 @@
 {
-  "updatedAt": "2026-10-14T01:28:06.152Z",
+  "updatedAt": "2026-10-15T01:01:40.189Z",
   "phases": {
     "ai": {
       "base": "http://127.0.0.1:3012",
-      "runAt": "2026-10-14T01:27:04.604Z",
+      "runAt": "2026-10-15T01:00:14.899Z",
       "cases": [
         {
           "id": "TC-LOGIN-01",
@@ -25,7 +25,7 @@
           "pass": true,
           "expected": "member01.role=member，leader01.role=leader",
           "actual": "member01.role=member，leader01.role=leader",
-          "durationMs": 118
+          "durationMs": 12
         },
         {
           "id": "TC-LOGIN-02b",
@@ -47,7 +47,7 @@
           "pass": true,
           "expected": "两种场景均 401 {code:401}",
           "actual": "无token=401，伪造token=401（{\"code\":401,\"message\":\"登录已失效，请重新登录\"}）",
-          "durationMs": 3
+          "durationMs": 2
         },
         {
           "id": "TC-AUTH-01",
@@ -80,7 +80,7 @@
           "pass": true,
           "expected": "403",
           "actual": "status=403 body={\"code\":403,\"message\":\"无权限访问\"}",
-          "durationMs": 2
+          "durationMs": 0
         },
         {
           "id": "TC-TPL-01",
@@ -91,7 +91,7 @@
           "pass": true,
           "expected": "四字段齐全，且每项带 maxItems/maxLen 约束",
           "actual": "status=200 keys=[\"weekDone\",\"ongoing\",\"issues\",\"nextPlan\"]",
-          "durationMs": 2
+          "durationMs": 0
         },
         {
           "id": "TC-GEN-01",
@@ -102,7 +102,7 @@
           "pass": true,
           "expected": "两种情况均 400 \"请输入本周工作描述\"",
           "actual": "空串=400(请输入本周工作描述)，缺失=400(请输入本周工作描述)",
-          "durationMs": 1
+          "durationMs": 2
         },
         {
           "id": "TC-GEN-02",
@@ -124,7 +124,7 @@
           "pass": true,
           "expected": "200，四字段齐全且与 Mock 输出一致（证明围栏剥离 + JSON 解析成功）",
           "actual": "status=200 weekDone=[\"完成登录接口联调\",\"周报模块 CRUD 实现\"]",
-          "durationMs": 20
+          "durationMs": 22
         },
         {
           "id": "TC-GEN-04b",
@@ -135,7 +135,7 @@
           "pass": true,
           "expected": "504 \"AI 生成超时，请重试\"，且耗时 ≥15s（确属超时而非快速失败）",
           "actual": "status=504 耗时=20.0s body={\"code\":504,\"message\":\"AI 生成超时，请重试\"}",
-          "durationMs": 20008
+          "durationMs": 20005
         },
         {
           "id": "TC-REP-04",
@@ -146,7 +146,7 @@
           "pass": true,
           "expected": "2026-W41=submitted，2026-W40=draft",
           "actual": "status=200 周次分布=[[\"2026-W41\",\"submitted\"],[\"2026-W40\",\"draft\"]]",
-          "durationMs": 4
+          "durationMs": 3
         },
         {
           "id": "TC-OVR-05",
@@ -157,7 +157,7 @@
           "pass": true,
           "expected": "400 \"暂无可汇总的周报\"",
           "actual": "status=400 body={\"code\":400,\"message\":\"暂无可汇总的周报\"}",
-          "durationMs": 4
+          "durationMs": 2
         },
         {
           "id": "TC-REP-01",
@@ -179,7 +179,7 @@
           "pass": true,
           "expected": "200，status=draft",
           "actual": "status=200 状态=draft",
-          "durationMs": 4
+          "durationMs": 2
         },
         {
           "id": "TC-REP-03",
@@ -188,9 +188,9 @@
           "priority": "P0",
           "phase": "ai",
           "pass": true,
-          "expected": "id 保持 rpt_25c61504d3d44a2e，本周报 1 条",
-          "actual": "返回id=rpt_25c61504d3d44a2e，本周条数=1",
-          "durationMs": 3
+          "expected": "id 保持 rpt_bddecedb274f49d6，本周报 1 条",
+          "actual": "返回id=rpt_bddecedb274f49d6，本周条数=1",
+          "durationMs": 2
         },
         {
           "id": "TC-TPL-03",
@@ -201,7 +201,7 @@
           "pass": true,
           "expected": "200，issues=[\"暂无\"]",
           "actual": "status=200 issues=[\"暂无\"]",
-          "durationMs": 2
+          "durationMs": 1
         },
         {
           "id": "TC-LEAD-01",
@@ -212,7 +212,7 @@
           "pass": true,
           "expected": "数组 4 项；leader01 等无周报者 report=null，3 名成员有上周周报",
           "actual": "status=200 人数=4 未开始=[\"leader01\"] 有报=[\"member01\",\"member02\",\"member03\"]",
-          "durationMs": 2
+          "durationMs": 1
         },
         {
           "id": "TC-LEAD-02",
@@ -234,7 +234,7 @@
           "pass": true,
           "expected": "200，lastEditorId=leader01",
           "actual": "status=200 lastEditorId=leader01",
-          "durationMs": 2
+          "durationMs": 1
         },
         {
           "id": "TC-AUTH-05",
@@ -256,7 +256,7 @@
           "pass": true,
           "expected": "最终 weekDone[0]=负责人写入内容，lastEditorId=leader01",
           "actual": "weekDone[0]=负责人最后一次写入的内容乙 lastEditorId=leader01",
-          "durationMs": 5
+          "durationMs": 3
         },
         {
           "id": "TC-OVR-01",
@@ -278,7 +278,7 @@
           "pass": true,
           "expected": "四段齐全，achievements 含\"姓名：\"前缀",
           "actual": "status=200 overall=\"本周团队整体推进顺利，核心接口联调完成，总览页待收尾。…\" achievements=[\"李成员：完成登录与周报 CRUD\",\"张成员：模板查询接口\",\"王负责人：代补风险说明\"]",
-          "durationMs": 4
+          "durationMs": 5
         },
         {
           "id": "TC-OVR-08a",
@@ -289,7 +289,7 @@
           "pass": true,
           "expected": "200；Content-Disposition 含中文文件名；文件头 3 字节为 UTF-8 BOM；四段标题齐全",
           "actual": "status=200 cd=\"attachment; filename=\"team-weekly-2026-W42.txt\"; filename*=UTF-8''%E5%9B%A2%E9%98%9F%E5%91…\" BOM=有(EF BB BF) 正文前40字=\"﻿整体进展：\\n本周团队整体推进顺利，核心接口联调完成，总览页待收尾。\\n\\n关键成果\"",
-          "durationMs": 2
+          "durationMs": 1
         },
         {
           "id": "TC-OVR-08b",
@@ -333,7 +333,7 @@
           "pass": true,
           "expected": "四种错误均 {code,message} 且 code===HTTP 状态",
           "actual": "400=400 401=401 403=403 404=404",
-          "durationMs": 4
+          "durationMs": 2
         },
         {
           "id": "TC-EDGE-02",
@@ -344,13 +344,13 @@
           "pass": true,
           "expected": "200，submitted→draft（与本周规则一致）",
           "actual": "status=200 状态=draft",
-          "durationMs": 2
+          "durationMs": 4
         }
       ]
     },
     "fail": {
       "base": "http://127.0.0.1:3012",
-      "runAt": "2026-10-14T01:27:20.426Z",
+      "runAt": "2026-10-15T01:01:32.969Z",
       "cases": [
         {
           "id": "TC-LOGIN-01",
@@ -372,7 +372,7 @@
           "pass": true,
           "expected": "member01.role=member，leader01.role=leader",
           "actual": "member01.role=member，leader01.role=leader",
-          "durationMs": 6
+          "durationMs": 4
         },
         {
           "id": "TC-LOGIN-02b",
@@ -394,7 +394,7 @@
           "pass": true,
           "expected": "两种场景均 401 {code:401}",
           "actual": "无token=401，伪造token=401（{\"code\":401,\"message\":\"登录已失效，请重新登录\"}）",
-          "durationMs": 2
+          "durationMs": 1
         },
         {
           "id": "TC-TPL-01",
@@ -405,7 +405,7 @@
           "pass": true,
           "expected": "四字段齐全，且每项带 maxItems/maxLen 约束",
           "actual": "status=200 keys=[\"weekDone\",\"ongoing\",\"issues\",\"nextPlan\"]",
-          "durationMs": 1
+          "durationMs": 0
         },
         {
           "id": "TC-EDGE-03a",
@@ -416,7 +416,7 @@
           "pass": true,
           "expected": "400，message 提示 2—5 条",
           "actual": "status=400 body={\"code\":400,\"message\":\"本周完成需 2—5 条，当前 1 条\"}",
-          "durationMs": 3
+          "durationMs": 1
         },
         {
           "id": "TC-EDGE-03b",
@@ -427,7 +427,7 @@
           "pass": true,
           "expected": "四种错误均 {code,message} 且 code===HTTP 状态",
           "actual": "400=400 401=401 403=403 404=404",
-          "durationMs": 4
+          "durationMs": 5
         },
         {
           "id": "TC-GEN-06",
@@ -449,13 +449,13 @@
           "pass": true,
           "expected": "504 \"生成失败，请重试\"",
           "actual": "status=504 body={\"code\":504,\"message\":\"生成失败，请重试\"}",
-          "durationMs": 3
+          "durationMs": 2
         }
       ]
     },
     "degraded": {
       "base": "http://127.0.0.1:3013",
-      "runAt": "2026-10-14T01:28:06.152Z",
+      "runAt": "2026-10-15T01:01:40.189Z",
       "cases": [
         {
           "id": "TC-LOGIN-01",
@@ -466,7 +466,7 @@
           "pass": true,
           "expected": "200，4 个账号（1 leader + 3 member），leader01=王负责人",
           "actual": "status=200，账号数=4，leader={\"id\":\"leader01\",\"name\":\"王负责人\",\"role\":\"leader\"}",
-          "durationMs": 3
+          "durationMs": 2
         },
         {
           "id": "TC-LOGIN-02",
@@ -477,7 +477,7 @@
           "pass": true,
           "expected": "member01.role=member，leader01.role=leader",
           "actual": "member01.role=member，leader01.role=leader",
-          "durationMs": 122
+          "durationMs": 10
         },
         {
           "id": "TC-LOGIN-02b",
@@ -488,7 +488,7 @@
           "pass": true,
           "expected": "400 {code:400, message 含\"不存在\"}",
           "actual": "status=400 body={\"code\":400,\"message\":\"用户 ghost 不存在\"}",
-          "durationMs": 2
+          "durationMs": 1
         },
         {
           "id": "TC-LOGIN-03",
@@ -499,7 +499,7 @@
           "pass": true,
           "expected": "两种场景均 401 {code:401}",
           "actual": "无token=401，伪造token=401（{\"code\":401,\"message\":\"登录已失效，请重新登录\"}）",
-          "durationMs": 3
+          "durationMs": 2
         },
         {
           "id": "TC-TPL-01",
@@ -521,7 +521,7 @@
           "pass": true,
           "expected": "400，message 提示 2—5 条",
           "actual": "status=400 body={\"code\":400,\"message\":\"本周完成需 2—5 条，当前 1 条\"}",
-          "durationMs": 2
+          "durationMs": 1
         },
         {
           "id": "TC-EDGE-03b",
@@ -532,7 +532,7 @@
           "pass": true,
           "expected": "四种错误均 {code,message} 且 code===HTTP 状态",
           "actual": "400=400 401=401 403=403 404=404",
-          "durationMs": 6
+          "durationMs": 4
         },
         {
           "id": "TC-OVR-05d",
@@ -543,7 +543,7 @@
           "pass": true,
           "expected": "400 \"暂无可汇总的周报\"",
           "actual": "status=400 body={\"code\":400,\"message\":\"暂无可汇总的周报\"}",
-          "durationMs": 1
+          "durationMs": 2
         },
         {
           "id": "TC-GEN-07a",
@@ -554,7 +554,7 @@
           "pass": true,
           "expected": "200，空模板（四字段为空数组，issues=[\"暂无\"]）",
           "actual": "status=200 body={\"weekDone\":[],\"ongoing\":[],\"issues\":[\"暂无\"],\"nextPlan\":[]}",
-          "durationMs": 1
+          "durationMs": 2
         },
         {
           "id": "TC-GEN-07b",
@@ -565,7 +565,7 @@
           "pass": true,
           "expected": "200，overall 含\"降级模式\"，achievements 含\"李成员：\"",
           "actual": "status=200 overall=\"本周共 1 名成员填写周报（已提交 1 份、草稿 0 份）。当前为降级模式下的规…\" achievements=[\"李成员：完成周报模块接口联调\",\"李成员：编写接口冒烟用例\"]",
-          "durationMs": 4
+          "durationMs": 3
         },
         {
           "id": "TC-GEN-07c",
