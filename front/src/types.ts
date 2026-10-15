@@ -198,10 +198,22 @@ export interface ProgressParseResult {
   no_signal: boolean;
 }
 
+/** 看板指标键（FR-05 四张卡 + 驾驶舱补充的两张概览卡） */
+export type MetricKey = 'total' | 'risk' | 'done' | 'published' | 'avgScore' | 'avgProgress';
+
 export interface MetricCard {
-  key: 'total' | 'risk' | 'done' | 'published';
+  key: MetricKey;
   label: string;
   value: number;
+  /** 单位后缀：个 / % / 分 */
+  suffix?: string;
+  /** 卡内副标题，例如「占总工作包 62.5%」 */
+  caption?: string;
+  tone: 'default' | 'primary' | 'success' | 'warning' | 'danger';
+  /** false 表示概览卡不支持下钻（如平均值类） */
+  drillable: boolean;
+  /** 迷你趋势序列，用于极值条形 indicate */
+  trend?: number[];
 }
 
 export interface DrilldownRow {
@@ -217,6 +229,103 @@ export interface DrilldownRow {
   risk_status: '正常' | '风险' | '逾期';
   deliverable_status: '已上传' | '未上传';
   score?: number;
+}
+
+/* ---------------- 驾驶舱聚合视图（FR-05 / FR-04 / FR-09） ---------------- */
+
+export type DrillLevel = 'center' | 'group' | 'person';
+
+/** 大目标卡片：加权进度 + 贡献占比（FR-04 R3/R4） */
+export interface ObjectiveBoard {
+  id: string;
+  name: string;
+  group_name: string;
+  owner_name: string;
+  status: Objective['status'];
+  /** 实时重算值 Σ(进度×权重)÷Σ(权重)，服务端口径（HLD §8） */
+  progress: number;
+  total_weight: number;
+  link_count: number;
+  done_count: number;
+  risk_count: number;
+  contributors: {
+    item_id: string;
+    user_id: string;
+    user_name: string;
+    item_title: string;
+    weight: number;
+    progress: number;
+    /** 单包权重 ÷ 关联总权重 × 100 */
+    contribution: number;
+  }[];
+}
+
+/** 组维度排行 */
+export interface GroupStat {
+  group_id: string;
+  group_name: string;
+  member_count: number;
+  contract_count: number;
+  item_count: number;
+  avg_progress: number;
+  avg_score: number;
+  risk_count: number;
+  published_count: number;
+}
+
+/** 个人维度排行 */
+export interface PersonStat {
+  user_id: string;
+  user_name: string;
+  group_name: string;
+  contract_status: ContractStatus | null;
+  item_count: number;
+  avg_progress: number;
+  score: number | null;
+  risk_count: number;
+  undelivered_count: number;
+}
+
+/** 四类任务分布 */
+export interface TypeSlice {
+  type: ItemType;
+  count: number;
+  weight: number;
+  avg_progress: number;
+}
+
+/** 评分档位分布（PRD FR-09 评分档位表） */
+export interface TierSlice {
+  tier: string;
+  range: string;
+  count: number;
+  color: string;
+}
+
+/** 发布前置校验（FR-09 R5 三项） */
+export interface PublishReadiness {
+  ok: boolean;
+  month: string;
+  total_contract: number;
+  published_count: number;
+  checks: { key: string; label: string; passed: boolean; detail: string }[];
+}
+
+export interface DashboardOverview {
+  month: string;
+  /** 当前视角范围说明 */
+  scope: { level: DrillLevel; group_id: string; group_name: string; member_count: number };
+  updated_at: string;
+  metrics: MetricCard[];
+  objectives: ObjectiveBoard[];
+  groups: GroupStat[];
+  /** 组筛选选项：与当前 scope 无关，避免选中某组后候选项塌陷 */
+  group_options: { group_id: string; group_name: string }[];
+  persons: PersonStat[];
+  type_slices: TypeSlice[];
+  tier_slices: TierSlice[];
+  risk_top: DrilldownRow[];
+  readiness: PublishReadiness;
 }
 
 export interface CalibrationRow {

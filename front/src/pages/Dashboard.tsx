@@ -1,190 +1,250 @@
-import { Alert, Button, Card, Col, Drawer, Input, Radio, Row, Space, Statistic, Table, Tag, Typography, message } from 'antd';
-import { useEffect, useState } from 'react';
-import EmptyState from '@/components/EmptyState';
-import RiskTag from '@/components/RiskTag';
-import { getDrilldown, getMetrics } from '@/services/api';
+import { Alert, Button, Card, Col, DatePicker, Radio, Row, Space, Spin, Tag, Tooltip, Typography, message } from 'antd';
+import dayjs from 'dayjs';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import DistributePanel from '@/components/dashboard/DistributePanel';
+import DrilldownDrawer from '@/components/dashboard/DrilldownDrawer';
+import ItemDetailDrawer from '@/components/dashboard/ItemDetailDrawer';
+import MetricCards from '@/components/dashboard/MetricCards';
+import ObjectivePanel from '@/components/dashboard/ObjectivePanel';
+import RankPanel from '@/components/dashboard/RankPanel';
+import ReadinessCard from '@/components/dashboard/ReadinessCard';
+import RiskPanel from '@/components/dashboard/RiskPanel';
+import { exportLedger, getDrilldown, getOverview } from '@/services/api';
 import { useAuth } from '@/store/auth';
-import { db } from '@/services/seed';
 import { toUserMessage } from '@/utils/error';
-import { currentMonth } from '@/utils/rules';
-import type { DrilldownRow } from '@/types';
+import { currentMonth, monthRange } from '@/utils/rules';
+import type { DashboardOverview, DrillLevel, DrilldownRow, MetricKey, PublishReadiness } from '@/types';
 
-const METRIC_TIP: Record<string, string> = {
-  total: '当期全部工作包（按截止日升序）',
-  risk: '仅风险与逾期工作包（按风险等级降序）',
-  done: '进度 = 100% 的工作包（按完成时间倒序）',
-  published: '已发布成员的合约与得分（按得分降序）',
+/** 加载中的占位：给足三项结构，避免 ReadinessCard 除零得到 NaN */
+const EMPTY_READINESS = (m: string): PublishReadiness => ({
+  ok: false,
+  month: m,
+  total_contract: 0,
+  published_count: 0,
+  checks: [
+    { key: 'weight', label: '有效任务权重合计 = 100%', passed: false, detail: '加载中…' },
+    { key: 'confirmed', label: '合约与评分全部确认完成', passed: false, detail: '加载中…' },
+    { key: 'abnormal', label: '无录入异常（权重/日期/交付物）', passed: false, detail: '加载中…' },
+  ],
+});
+
+const METRIC_LABEL: Record<MetricKey, string> = {
+  total: '工作包总数',
+  risk: '风险 / 逾期',
+  done: '已完成',
+  published: '已发布绩效',
+  avgScore: '平均履约得分',
+  avgProgress: '整体推进度',
 };
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [month, setMonth] = useState(currentMonth());
-  const [groupId, setGroupId] = useState(user?.role === 'leader' ? (user?.group_id ?? 'all') : 'all');
-  const [level, setLevel] = useState<'center' | 'group' | 'person'>('center');
-  const [metrics, setMetrics] = useState<Awaited<ReturnType<typeof getMetrics>>>([]);
-  const [open, setOpen] = useState(false);
-  const [currentMetric, setCurrentMetric] = useState<'total' | 'risk' | 'done' | 'published'>('total');
+  const [groupId, setGroupId] = useState<string>(user?.role === 'leader' ? (user?.group_id ?? 'all') : 'all');
+  const [level, setLevel] = useState<DrillLevel>('center');
+  const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // 下钻态
+  const [metric, setMetric] = useState<MetricKey>('total');
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [rows, setRows] = useState<DrilldownRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [detail, setDetail] = useState<DrilldownRow | null>(null);
+  const [rowsLoading, setRowsLoading] = useState(false);
+  const [personId, setPersonId] = useState('all');
+  const [detailRow, setDetailRow] = useState<DrilldownRow | null>(null);
 
-  const loadMetrics = async () => {
-    try {
-      setMetrics(await getMetrics(month, groupId));
-    } catch (e) {
-      message.error(toUserMessage(e));
-    }
-  };
+  const isCenter = user?.role === 'center';
+  const isLeader = user?.role === 'leader';
 
-  useEffect(() => {
-    void loadMetrics();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, groupId]);
-
-  const drill = async (metric: 'total' | 'risk' | 'done' | 'published') => {
-    setCurrentMetric(metric);
+  const load = useCallback(async () => {
     setLoading(true);
-    setOpen(true);
     try {
-      setRows(await getDrilldown(metric, month, groupId));
+      setOverview(await getOverview(month, groupId, level));
     } catch (e) {
       message.error(toUserMessage(e));
     } finally {
       setLoading(false);
     }
+  }, [month, groupId, level]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // 抽屉打开或切换维度时重新取明细，保证卡上数字 = 明细条数（FR-05 R5）
+  useEffect(() => {
+    if (!drawerOpen) return;
+    let alive = true;
+    setRowsLoading(true);
+    getDrilldown(metric, month, groupId, level, personId)
+      .then((r) => alive && setRows(r))
+      .catch((e: unknown) => alive && message.error(toUserMessage(e)))
+      .finally(() => alive && setRowsLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [drawerOpen, metric, month, groupId, level, personId]);
+
+  const openDrill = (key: MetricKey) => {
+    if (key === 'avgScore' || key === 'avgProgress') return;
+    setMetric(key);
+    setDrawerOpen(true);
   };
 
-  const filtered = level === 'person' && rows.length ? rows : rows;
+  /** 可选月份：入职月至今（FR-06 R1） */
+  const minMonth = useMemo(() => {
+    const list = monthRange(user?.join_month ?? '2023-01');
+    return dayjs(`${list[list.length - 1]}-01`);
+  }, [user?.join_month]);
+
+  const handleExport = async () => {
+    try {
+      const csv = await exportLedger(month);
+      const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `月度台账_${month}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      message.success('台账已导出');
+    } catch (e) {
+      message.error(toUserMessage(e));
+    }
+  };
+
+  const scope = overview?.scope;
 
   return (
-    <Space direction="vertical" size={12} style={{ width: '100%' }}>
-      <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-        <Typography.Title level={4} className="page-title">
-          部门看板
-        </Typography.Title>
-        <Space>
-          <Input.Search placeholder="YYYY-MM" enterButton="切换" defaultValue={month} onSearch={(v) => setMonth(v || month)} style={{ width: 220 }} />
-          {user?.role === 'center' && (
-            <Radio.Group value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-              <Radio.Button value="all">全中心</Radio.Button>
-              {db.groups.filter((g) => g.id !== 'grp_root').map((g) => (
-                <Radio.Button key={g.id} value={g.id}>
-                  {g.name}
-                </Radio.Button>
-              ))}
-            </Radio.Group>
-          )}
-        </Space>
-      </Space>
+    <div className="dash-root">
+      {/* 顶部控制栏 */}
+      <Card size="small" style={{ marginBottom: 12 }}>
+        <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}>
+          <Space size={10} align="center">
+            <Typography.Title level={4} style={{ margin: 0 }}>
+              目标合约驾驶舱
+            </Typography.Title>
+            {scope && (
+              <Tag color="blue">{scope.group_name} · {scope.member_count} 名成员</Tag>
+            )}
+            {isLeader && <Tag color="green">组长视角：仅本组数据</Tag>}
+            {overview && (
+              <Tooltip title="数据口径：基于权重与目标值实时聚合，非缓存">
+                <span style={{ color: '#bbb', fontSize: 12 }}>更新于 {overview.updated_at}</span>
+              </Tooltip>
+            )}
+          </Space>
 
-      <Alert type="info" showIcon message="点击指标卡即可下钻；卡上的数字必须与下钻明细条数一致（FR-05 R5）" />
-
-      <Row gutter={[12, 12]}>
-        {metrics.map((m) => (
-          <Col xs={12} md={6} key={m.key}>
-            <Card hoverable onClick={() => void drill(m.key as 'total')} style={{ cursor: 'pointer' }}>
-              <Statistic title={m.label} value={m.value} suffix={<span style={{ fontSize: 12, color: '#bbb' }}>{METRIC_TIP[m.key]?.slice(0, 0)}</span>} />
-              <div style={{ color: '#999', fontSize: 12, marginTop: 6 }}>{METRIC_TIP[m.key]}</div>
-            </Card>
-          </Col>
-        ))}
-      </Row>
-
-      <Card size="small" title="大目标加权进度">
-        <Space direction="vertical" style={{ width: '100%' }}>
-          {db.objectives.map((o) => (
-            <Row key={o.id} align="middle" gutter={12}>
-              <Col span={10}>{o.name}</Col>
-              <Col span={10}>
-                <ProgressLine value={o.progress} />
-              </Col>
-              <Col span={4}>{o.progress}%</Col>
-            </Row>
-          ))}
+          <Space wrap size={8}>
+            <DatePicker
+              picker="month"
+              allowClear={false}
+              value={dayjs(`${month}-01`)}
+              disabledDate={(cur) => cur.isBefore(minMonth, 'month') || cur.isAfter(dayjs(), 'month')}
+              onChange={(d) => setMonth(d ? d.format('YYYY-MM') : currentMonth())}
+              style={{ width: 130 }}
+            />
+            {isCenter && (
+              <Radio.Group
+                size="small"
+                value={groupId}
+                onChange={(e) => setGroupId(e.target.value)}
+                optionType="button"
+                options={[
+                  { label: '全中心', value: 'all' },
+                  ...(overview?.group_options ?? []).map((g) => ({ label: g.group_name, value: g.group_id })),
+                ]}
+              />
+            )}
+            <Radio.Group
+              size="small"
+              value={level}
+              onChange={(e) => setLevel(e.target.value)}
+              optionType="button"
+              options={[
+                { label: '中心级', value: 'center' },
+                { label: '组级', value: 'group' },
+                { label: '个人级', value: 'person' },
+              ]}
+            />
+            <Button size="small" onClick={() => void load()} loading={loading}>刷新</Button>
+            <Button size="small" onClick={() => void handleExport()}>导出台账</Button>
+          </Space>
         </Space>
       </Card>
 
-      <Drawer
-        open={open}
-        title={`${metrics.find((m) => m.key === currentMetric)?.label ?? ''} · 下钻明细（${rows.length} 条）`}
-        width={1100}
-        onClose={() => setOpen(false)}
-        extra={
-          <Radio.Group value={level} onChange={(e) => setLevel(e.target.value)}>
-            <Radio.Button value="center">中心</Radio.Button>
-            <Radio.Button value="group">组</Radio.Button>
-            <Radio.Button value="person">个人</Radio.Button>
-          </Radio.Group>
-        }
-      >
-        {!loading && rows.length === 0 ? (
-          <EmptyState description="该指标下暂无明细" />
-        ) : (
-          <Table
-            rowKey="id"
-            size="small"
-            loading={loading}
-            pagination={false}
-            scroll={{ x: 1200 }}
-            dataSource={filtered}
-            columns={[
-              { title: '成员', dataIndex: 'user_name', width: 90 },
-              { title: '工作包', dataIndex: 'item_title', width: 180 },
-              { title: '类型', dataIndex: 'type', width: 100 },
-              { title: '大目标', dataIndex: 'objective_name', width: 180 },
-              { title: '权重', dataIndex: 'weight', width: 80, align: 'right', render: (v: number) => `${v}%` },
-              { title: '进度', dataIndex: 'progress', width: 150, render: (v: number) => <ProgressLine value={v} /> },
-              { title: '截止日', dataIndex: 'due_date', width: 110 },
-              { title: '风险状态', dataIndex: 'risk_status', width: 90, render: (v: '正常' | '风险' | '逾期') => <RiskTag status={v} /> },
-              {
-                title: '交付物',
-                dataIndex: 'deliverable_status',
-                width: 100,
-                render: (v: string) => <Tag color={v === '已上传' ? 'green' : 'red'}>{v}</Tag>,
-              },
-              {
-                title: '操作',
-                key: 'op',
-                width: 80,
-                render: (_, r: DrilldownRow) => (
-                  <Button type="link" size="small" onClick={() => setDetail(r)}>
-                    详情
-                  </Button>
-                ),
-              },
-            ]}
-          />
-        )}
-      </Drawer>
+      {!loading && overview && overview.metrics.every((m) => m.value === 0) ? (
+        <Alert
+          type="warning"
+          showIcon
+          message={`${month} 暂无合约数据`}
+          description="当前统计范围内没有已创建的合约。可切换到已有数据的月份，或以员工身份创建合约后再回到本页查看。"
+        />
+      ) : null}
 
-      <Drawer open={Boolean(detail)} title="工作包详情（只读）" width={520} onClose={() => setDetail(null)}>
-        {detail && (
-          <Space direction="vertical">
-            <Typography.Text strong>{detail.item_title}</Typography.Text>
-            <Typography.Text type="secondary">{detail.type} · {detail.objective_name}</Typography.Text>
-            <div>成员：{detail.user_name}</div>
-            <div>权重：{detail.weight}% ｜ 进度：{detail.progress}%</div>
-            <div>截止日：{detail.due_date} ｜ 风险：<RiskTag status={detail.risk_status} /></div>
-            <div>交付物：{detail.deliverable_status}</div>
-            <div>评分：{typeof detail.score === 'number' ? `${detail.score} 分` : '未评分'}</div>
-            <Alert type="info" showIcon message="明细含进度留痕、交付物、变更记录（只读，FR-05 R3）" />
+      {/* 指标卡区 */}
+      <MetricCards metrics={overview?.metrics ?? []} loading={loading} activeKey={drawerOpen ? metric : undefined} onDrill={openDrill} />
+
+      {/* 主体三栏 */}
+      <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
+        <Col xs={24} lg={16}>
+          <ObjectivePanel objectives={overview?.objectives ?? []} loading={loading} />
+        </Col>
+        <Col xs={24} lg={8}>
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <ReadinessCard
+              readiness={overview?.readiness ?? EMPTY_READINESS(month)}
+              loading={loading}
+              month={month}
+              canCalibrate={isCenter}
+            />
+            <RiskPanel
+              riskTop={overview?.risk_top ?? []}
+              loading={loading}
+              onDrill={(m) => openDrill(m)}
+            />
           </Space>
-        )}
-      </Drawer>
-    </Space>
-  );
-}
+        </Col>
+      </Row>
 
-function ProgressLine({ value }: { value: number }) {
-  return (
-    <div style={{ background: '#f0f0f0', height: 8, borderRadius: 4, overflow: 'hidden' }}>
-      <div
-        style={{
-          width: `${Math.min(100, Math.max(0, value))}%`,
-          height: '100%',
-          background: value >= 100 ? '#52c41a' : '#1677ff',
-        }}
+      {/* 分布 */}
+      <div style={{ marginTop: 12 }}>
+        <DistributePanel types={overview?.type_slices ?? []} tiers={overview?.tier_slices ?? []} loading={loading} />
+      </div>
+
+      {/* 排行 */}
+      <div style={{ marginTop: 12 }}>
+        <RankPanel
+          groups={overview?.groups ?? []}
+          persons={overview?.persons ?? []}
+          loading={loading}
+          lockGroup={isLeader}
+          onPickPerson={(uid) => {
+            setLevel('person');
+            setPersonId(uid);
+            setMetric('total');
+            setDrawerOpen(true);
+          }}
+        />
+      </div>
+
+      {loading && !overview && <Spin style={{ display: 'block', margin: '48px auto' }} />}
+
+      <DrilldownDrawer
+        open={drawerOpen}
+        metric={metric}
+        metricLabel={METRIC_LABEL[metric]}
+        rows={rows}
+        loading={rowsLoading}
+        level={level}
+        personId={personId}
+        persons={overview?.persons ?? []}
+        onLevelChange={setLevel}
+        onPersonChange={setPersonId}
+        onClose={() => setDrawerOpen(false)}
+        onOpenItem={(r) => setDetailRow(r)}
       />
+
+      <ItemDetailDrawer row={detailRow} onClose={() => setDetailRow(null)} />
     </div>
   );
 }

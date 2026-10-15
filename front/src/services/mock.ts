@@ -5,33 +5,45 @@
 import dayjs from 'dayjs';
 import { ApiError } from '@/utils/error';
 import {
+  SCORE_TIERS,
   checkItem,
   dateInMonth,
   deviationAdvice,
   isCheckFailed,
   monthlyScore,
   normalizeWeights,
+  now,
   objectiveProgress,
   riskStatus,
   sumWeight,
   validateContract,
   validateScore,
 } from '@/utils/rules';
-import type {
-  AiContractResult,
-  AuthResult,
-  CalibrationRow,
-  ChangeReason,
-  Contract,
-  ContractItem,
-  Deliverable,
-  DrilldownRow,
-  ItemCheck,
-  MetricCard,
-  ProgressParseResult,
-  ReportEntry,
-  SkillTag,
-  User,
+import {
+  ITEM_TYPES,
+  type AiContractResult,
+  type AuthResult,
+  type CalibrationRow,
+  type ChangeReason,
+  type Contract,
+  type ContractItem,
+  type DashboardOverview,
+  type Deliverable,
+  type DrillLevel,
+  type DrilldownRow,
+  type GroupStat,
+  type ItemCheck,
+  type MetricCard,
+  type MetricKey,
+  type ObjectiveBoard,
+  type PersonStat,
+  type ProgressParseResult,
+  type PublishReadiness,
+  type ReportEntry,
+  type SkillTag,
+  type TierSlice,
+  type TypeSlice,
+  type User,
 } from '@/types';
 import { db } from './seed';
 
@@ -671,24 +683,44 @@ export const mockCalibration = (month: string) =>
     });
   }, 400);
 
-/** 发布前置校验三项（FR-09 R5） */
-const mockPublishCheckFor = (c: Contract): string[] => {
-  const issues: string[] = [];
+/** 发布前置校验的三大分类（FR-09 R5） */
+type CheckCategory = 'weight' | 'confirm' | 'abnormal';
+
+/**
+ * 发布前置校验的唯一实现（FR-09 R5）。
+ * 「看板就绪度」与「确认发布」共用本函数，保证两处口径不会打架。
+ */
+const publishIssuesFor = (c: Contract): { category: CheckCategory; message: string }[] => {
+  const issues: { category: CheckCategory; message: string }[] = [];
   const items = itemsOf(c.id);
-  if (!items.length) return ['本月无合约'];
+  if (!items.length) return [{ category: 'confirm', message: '本月无合约' }];
+
   // ① 有效任务权重合计 = 100%
   const total = sumWeight(items);
-  if (total !== 100) issues.push(`有效权重合计 ${total}% ≠ 100%`);
+  if (total !== 100) issues.push({ category: 'weight', message: `有效权重合计 ${total}% ≠ 100%` });
+
   // ② 合约与评分全部确认完成
-  if (c.status === 'draft' || c.status === 'submitted') issues.push('合约尚未完成组长核对确认');
+  if (c.status === 'draft' || c.status === 'submitted') {
+    issues.push({ category: 'confirm', message: '合约尚未完成组长核对确认' });
+  }
   const unscored = items.filter((i) => typeof i.score !== 'number');
-  if (unscored.length) issues.push(`存在 ${unscored.length} 个工作包未评分`);
-  // ③ 无录入异常
-  if (items.some((i) => dayjs(i.due_date).format('YYYY-MM') !== c.month)) issues.push('存在截止日不在合约月份内');
-  if (items.some((i) => !i.deliverable_type || !i.deliverable_desc)) issues.push('存在工作包缺少交付物约定');
-  if (items.some((i) => i.type !== '基础履职类' && !i.objective_id)) issues.push('存在非基础履职类工作包未关联大目标');
+  if (unscored.length) issues.push({ category: 'confirm', message: `存在 ${unscored.length} 个工作包未评分` });
+
+  // ③ 无录入异常（权重/日期/交付物）
+  if (items.some((i) => dayjs(i.due_date).format('YYYY-MM') !== c.month)) {
+    issues.push({ category: 'abnormal', message: '存在截止日不在合约月份内' });
+  }
+  if (items.some((i) => !i.deliverable_type || !i.deliverable_desc)) {
+    issues.push({ category: 'abnormal', message: '存在工作包缺少交付物约定' });
+  }
+  if (items.some((i) => i.type !== '基础履职类' && !i.objective_id)) {
+    issues.push({ category: 'abnormal', message: '存在非基础履职类工作包未关联大目标' });
+  }
   return issues;
 };
+
+/** 字符串形式，供校验页/发布接口沿用既有契约 */
+const mockPublishCheckFor = (c: Contract): string[] => publishIssuesFor(c).map((x) => x.message);
 
 export const mockPublishCheck = (month: string) =>
   call(() => {
@@ -851,29 +883,300 @@ const monthItemRows = (month: string, u: User, groupId?: string): DrilldownRow[]
     });
 };
 
-export const mockMetrics = (month: string, groupId = 'all') =>
+/** 百分比，用于指标卡副标题（除零保护） */
+const pct = (n: number, d: number) => (d ? Math.round((n / d) * 1000) / 10 : 0);
+const avg = (ns: number[]) => (ns.length ? Math.round((ns.reduce((s, n) => s + n, 0) / ns.length) * 10) / 10 : 0);
+
+/** 组内可见成员的当月合约 */
+const scopedContracts = (month: string, u: User, groupId = 'all') => {
+  const ids = new Set(visibleUserIds(u));
+  return db.contracts.filter((c) => {
+    if (c.month !== month || !ids.has(c.user_id)) return false;
+    if (groupId !== 'all') return db.users.find((x) => x.id === c.user_id)?.group_id === groupId;
+    return true;
+  });
+};
+
+export const mockMetrics = (month: string, groupId = 'all'): Promise<MetricCard[]> =>
   call<MetricCard[]>(() => {
     const u = currentUser();
     const rows = monthItemRows(month, u, groupId);
-    const published = db.contracts.filter((c) => c.month === month && c.status === 'published' && visibleUserIds(u).includes(c.user_id)).length;
+    const riskCount = rows.filter((r) => r.risk_status !== '正常').length;
+    const doneCount = rows.filter((r) => r.progress >= 100).length;
+    const published = scopedContracts(month, u, groupId).filter((c) => c.status === 'published').length;
+    const scored = rows.filter((r) => typeof r.score === 'number').map((r) => r.score as number);
     return [
-      { key: 'total', label: '工作包总数', value: rows.length },
-      { key: 'risk', label: '风险 / 逾期', value: rows.filter((r) => r.risk_status !== '正常').length },
-      { key: 'done', label: '已完成', value: rows.filter((r) => r.progress >= 100).length },
-      { key: 'published', label: '已发布绩效', value: published },
+      {
+        key: 'total', label: '工作包总数', value: rows.length, suffix: '个',
+        caption: `覆盖 ${new Set(rows.map((r) => r.user_id)).size} 名成员`, tone: 'primary', drillable: true,
+      },
+      {
+        key: 'risk', label: '风险 / 逾期', value: riskCount, suffix: '个',
+        caption: `占工作包 ${pct(riskCount, rows.length)}%`, tone: riskCount ? 'danger' : 'success', drillable: true,
+      },
+      {
+        key: 'done', label: '已完成', value: doneCount, suffix: '个',
+        caption: `完成率 ${pct(doneCount, rows.length)}%`, tone: 'success', drillable: true,
+      },
+      {
+        key: 'published', label: '已发布绩效', value: published, suffix: '人',
+        caption: `本月共 ${scopedContracts(month, u, groupId).length} 份合约`, tone: 'default', drillable: true,
+      },
+      {
+        key: 'avgScore', label: '平均履约得分', value: avg(scored), suffix: '分',
+        caption: scored.length ? `已评 ${scored.length} 个工作包` : '本月尚无评分', tone: 'primary', drillable: false,
+      },
+      {
+        key: 'avgProgress', label: '平均进度', value: avg(rows.map((r) => r.progress)), suffix: '%',
+        caption: `合计权重 ${sumWeight(rows)}%`, tone: 'default', drillable: false,
+      },
     ];
   }, 300);
 
-export const mockDrilldown = (metric: MetricCard['key'], month: string, groupId = 'all') =>
+/** 下钻：支持中心/组/个人三级（FR-05 R1），并在 metric 维度上做确定性过滤（R5 条数一致） */
+export const mockDrilldown = (
+  metric: MetricKey,
+  month: string,
+  groupId = 'all',
+  level: DrillLevel = 'center',
+  personId = 'all',
+): Promise<DrilldownRow[]> =>
   call<DrilldownRow[]>(() => {
     const u = currentUser();
     let rows = monthItemRows(month, u, groupId);
-    if (metric === 'risk') rows = rows.filter((r) => r.risk_status !== '正常').sort((a, b) => (a.risk_status === '逾期' ? 1 : 0) - (b.risk_status === '逾期' ? 1 : 0));
-    if (metric === 'done') rows = rows.filter((r) => r.progress >= 100).sort((a, b) => b.due_date.localeCompare(a.due_date));
-    if (metric === 'published') rows = rows.filter((r) => typeof r.score === 'number').sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-    if (metric === 'total') rows = rows.sort((a, b) => a.due_date.localeCompare(b.due_date));
+
+    // R1 三级过滤：组/个人在已按行级权限裁剪的集合上再收敛
+    if (level === 'group' && groupId === 'all') {
+      // 中心视角下按组归类时不削减数据，交由前端分组展示
+    }
+    if (level === 'person' && personId !== 'all') {
+      rows = rows.filter((r) => r.user_id === personId);
+    }
+
+    switch (metric) {
+      case 'risk':
+        rows = rows
+          .filter((r) => r.risk_status !== '正常')
+          .sort((a, b) => (a.risk_status === '逾期' ? 0 : 1) - (b.risk_status === '逾期' ? 0 : 1));
+        break;
+      case 'done':
+        rows = rows.filter((r) => r.progress >= 100).sort((a, b) => b.due_date.localeCompare(a.due_date));
+        break;
+      case 'published': {
+        const publishedIds = new Set(
+          scopedContracts(month, u, groupId).filter((c) => c.status === 'published').map((c) => c.id),
+        );
+        rows = rows
+          .filter((r) => {
+            const it = db.items.find((x) => x.id === r.id);
+            return it ? publishedIds.has(it.contract_id) : false;
+          })
+          .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+        break;
+      }
+      case 'total':
+        rows = rows.sort((a, b) => a.due_date.localeCompare(b.due_date));
+        break;
+      default:
+        rows = rows.sort((a, b) => a.due_date.localeCompare(b.due_date));
+    }
     return rows;
   }, 400);
+
+/* ---------------- 驾驶舱聚合（FR-05 + FR-04 R4 + FR-09 R5） ---------------- */
+
+export const mockOverview = (month: string, groupId = 'all', level: DrillLevel = 'center'): Promise<DashboardOverview> =>
+  call<DashboardOverview>(() => {
+    const u = currentUser();
+    const groupName = groupId === 'all' ? '全中心' : (db.groups.find((g) => g.id === groupId)?.name ?? groupId);
+    const contracts = scopedContracts(month, u, groupId);
+    const memberIds = [...new Set(contracts.map((c) => c.user_id))];
+    const rows = monthItemRows(month, u, groupId);
+
+    /* 1) 大目标：实时重算加权进度 + 贡献占比（FR-04 R3/R4） */
+    recomputeObjectives();
+    const objectives: ObjectiveBoard[] = db.objectives
+      .filter((o) => (u.role === 'leader' ? o.group_id === u.group_id : true))
+      .map((o) => {
+        const linked = db.items.filter((i) => i.objective_id === o.id && rows.some((r) => r.id === i.id));
+        const totalWeight = linked.reduce((s, i) => s + i.weight, 0);
+        return {
+          id: o.id,
+          name: o.name,
+          group_name: db.groups.find((g) => g.id === o.group_id)?.name ?? '—',
+          owner_name: db.users.find((x) => x.id === o.owner_id)?.name ?? '—',
+          status: o.status,
+          progress: objectiveProgress(linked),
+          total_weight: totalWeight,
+          link_count: linked.length,
+          done_count: linked.filter((i) => i.progress >= 100).length,
+          risk_count: linked.filter((i) => riskStatus(i) !== '正常').length,
+          contributors: linked
+            .map((i) => {
+              const c = db.contracts.find((x) => x.id === i.contract_id) as Contract;
+              const owner = db.users.find((x) => x.id === c.user_id) as User;
+              return {
+                item_id: i.id,
+                user_id: c.user_id,
+                user_name: owner.name,
+                item_title: i.title,
+                weight: i.weight,
+                progress: i.progress,
+                contribution: totalWeight ? Math.round((i.weight / totalWeight) * 1000) / 10 : 0,
+              };
+            })
+            .sort((a, b) => b.contribution - a.contribution),
+        };
+      });
+
+    /* 2) 组维度排行 */
+    const groupIds = [...new Set(memberIds.map((id) => db.users.find((x) => x.id === id)?.group_id ?? ''))].filter(Boolean);
+    const groups: GroupStat[] = groupIds.map((gid) => {
+      const members = memberIds.filter((id) => db.users.find((x) => x.id === id)?.group_id === gid);
+      const gRows = rows.filter((r) => members.includes(r.user_id));
+      const gContracts = contracts.filter((c) => members.includes(c.user_id));
+      const gScores = gRows.filter((r) => typeof r.score === 'number').map((r) => r.score as number);
+      return {
+        group_id: gid,
+        group_name: db.groups.find((g) => g.id === gid)?.name ?? gid,
+        member_count: members.length,
+        contract_count: gContracts.length,
+        item_count: gRows.length,
+        avg_progress: avg(gRows.map((r) => r.progress)),
+        avg_score: avg(gScores),
+        risk_count: gRows.filter((r) => r.risk_status !== '正常').length,
+        published_count: gContracts.filter((c) => c.status === 'published').length,
+      };
+    }).sort((a, b) => b.avg_progress - a.avg_progress);
+
+    /* 3) 个人维度排行 */
+    const persons: PersonStat[] = memberIds.map((uid) => {
+      const owner = db.users.find((x) => x.id === uid) as User;
+      const pRows = rows.filter((r) => r.user_id === uid);
+      const contract = contracts.find((c) => c.user_id === uid) ?? null;
+      const scores = pRows.filter((r) => typeof r.score === 'number').map((r) => r.score as number);
+      return {
+        user_id: uid,
+        user_name: owner.name,
+        group_name: db.groups.find((g) => g.id === owner.group_id)?.name ?? '—',
+        contract_status: contract?.status ?? null,
+        item_count: pRows.length,
+        avg_progress: avg(pRows.map((r) => r.progress)),
+        score: contract?.score ?? (scores.length ? avg(scores) : null),
+        risk_count: pRows.filter((r) => r.risk_status !== '正常').length,
+        undelivered_count: pRows.filter((r) => r.deliverable_status === '未上传').length,
+      };
+    }).sort((a, b) => b.avg_progress - a.avg_progress);
+
+    /* 4) 四类任务分布（PRD FR-02 R1 枚举顺序） */
+    const type_slices: TypeSlice[] = ITEM_TYPES.map((t) => {
+      const list = rows.filter((r) => r.type === t);
+      return {
+        type: t,
+        count: list.length,
+        weight: sumWeight(list),
+        avg_progress: avg(list.map((r) => r.progress)),
+      };
+    });
+
+    /* 5) 评分档位分布（PRD FR-09 评分档位表） */
+    const scoredRows = rows.filter((r) => typeof r.score === 'number');
+    const tier_slices: TierSlice[] = SCORE_TIERS.map((t) => ({
+      tier: t.tier,
+      range: t.range,
+      count: scoredRows.filter((r) => (r.score as number) >= t.min && (r.score as number) <= t.max).length,
+      color: t.max < 80 ? '#cf1322' : t.max < 100 ? '#fa8c16' : t.max === 100 ? '#1677ff' : '#52c41a',
+    }));
+
+    /* 6) 发布前置校验三项（FR-09 R5） */
+    const weightIssues = memberIds.filter((uid) => {
+      const c = contracts.find((x) => x.user_id === uid);
+      return c ? sumWeight(itemsOf(c.id)) !== 100 : false;
+    });
+    const unconfirmed = contracts.filter((c) => c.status !== 'confirmed' && c.status !== 'rated' && c.status !== 'published');
+    const dueIssues = rows.filter((r) => dayjs(r.due_date).format('YYYY-MM') !== month);
+    const readiness: PublishReadiness = {
+      ok: weightIssues.length === 0 && unconfirmed.length === 0 && dueIssues.length === 0,
+      month,
+      total_contract: contracts.length,
+      published_count: contracts.filter((c) => c.status === 'published').length,
+      checks: [
+        {
+          key: 'weight', label: '有效任务权重合计 = 100%', passed: weightIssues.length === 0,
+          detail: weightIssues.length
+            ? `${weightIssues.length} 人权重合计 ≠ 100%：${weightIssues.map((id) => db.users.find((x) => x.id === id)?.name).join('、')}`
+            : '全部合约权重校验通过',
+        },
+        {
+          key: 'confirmed', label: '合约与评分全部确认完成', passed: unconfirmed.length === 0,
+          detail: unconfirmed.length
+            ? `${unconfirmed.length} 份合约尚未完成核对/评分`
+            : '全部合约已完成核对与评分',
+        },
+        {
+          key: 'abnormal', label: '无录入异常（权重/日期/交付物）', passed: dueIssues.length === 0,
+          detail: dueIssues.length
+            ? `${dueIssues.length} 个工作包截止日不在合约月份内`
+            : '无录入异常项',
+        },
+      ],
+    };
+
+    /* 7) 风险：TOP5 仅用于展示，指标卡必须取全量计数以保证「卡上的数字 = 下钻明细条数」（FR-05 R5） */
+    const riskAll = rows
+      .filter((r) => r.risk_status !== '正常')
+      .sort((a, b) => (a.risk_status === '逾期' ? 0 : 1) - (b.risk_status === '逾期' ? 0 : 1));
+    const risk_top = riskAll.slice(0, 5);
+
+    const metrics: MetricCard[] = [
+      {
+        key: 'total', label: '工作包总数', value: rows.length, suffix: '个',
+        caption: `覆盖 ${memberIds.length} 名成员`, tone: 'primary', drillable: true,
+      },
+      {
+        key: 'risk', label: '风险 / 逾期', value: riskAll.length, suffix: '个',
+        caption: `占工作包 ${pct(riskAll.length, rows.length)}%`,
+        tone: riskAll.length ? 'danger' : 'success', drillable: true,
+      },
+      {
+        key: 'done', label: '已完成', value: rows.filter((r) => r.progress >= 100).length, suffix: '个',
+        caption: `完成率 ${pct(rows.filter((r) => r.progress >= 100).length, rows.length)}%`, tone: 'success', drillable: true,
+      },
+      {
+        key: 'published', label: '已发布绩效', value: readiness.published_count, suffix: '人',
+        caption: `本月共 ${contracts.length} 份合约`, tone: 'default', drillable: true,
+      },
+      {
+        key: 'avgScore', label: '平均履约得分', value: avg(scoredRows.map((r) => r.score as number)), suffix: '分',
+        caption: scoredRows.length ? `已评 ${scoredRows.length} 个工作包` : '本月尚无评分', tone: 'primary', drillable: false,
+      },
+      {
+        key: 'avgProgress', label: '整体推进度', value: avg(rows.map((r) => r.progress)), suffix: '%',
+        caption: `合计权重 ${sumWeight(rows)}%`, tone: 'default', drillable: false,
+      },
+    ];
+
+    /* 8) 组筛选选项：按角色权限恒定给出，不受当前 groupId 影响，避免选中后选项塌陷 */
+    const group_options = db.groups
+      .filter((g) => g.id !== 'grp_root')
+      .filter((g) => (u.role === 'center' ? true : g.id === u.group_id))
+      .map((g) => ({ group_id: g.id, group_name: g.name }));
+
+    return {
+      month,
+      scope: { level, group_id: groupId, group_name: groupName, member_count: memberIds.length },
+      updated_at: now(),
+      metrics,
+      objectives,
+      groups,
+      group_options,
+      persons,
+      type_slices,
+      tier_slices,
+      risk_top,
+      readiness,
+    };
+  }, 320);
 
 /* ---------------- 能力画像 FR-08 ---------------- */
 

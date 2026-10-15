@@ -11,10 +11,13 @@ import type {
   ChangeReason,
   Contract,
   ContractItem,
+  DashboardOverview,
   Deliverable,
+  DrillLevel,
   DrilldownRow,
   ItemCheck,
   MetricCard,
+  MetricKey,
   Objective,
   ProgressParseResult,
   ReportEntry,
@@ -147,10 +150,20 @@ export const returnForBasis = (contractId: string, opinion: string): Promise<Con
 export const getMetrics = (month: string, groupId = 'all'): Promise<MetricCard[]> =>
   USE_MOCK ? mock.mockMetrics(month, groupId) : get<MetricCard[]>('/dashboard/metrics', { month, group: groupId });
 
-export const getDrilldown = (metric: MetricCard['key'], month: string, groupId = 'all'): Promise<DrilldownRow[]> =>
+export const getDrilldown = (
+  metric: MetricKey,
+  month: string,
+  groupId = 'all',
+  level: DrillLevel = 'center',
+  personId = 'all',
+): Promise<DrilldownRow[]> =>
   USE_MOCK
-    ? mock.mockDrilldown(metric, month, groupId)
-    : get<DrilldownRow[]>('/dashboard/drilldown', { metric, month, group: groupId, level: groupId === 'all' ? 'center' : 'group' });
+    ? mock.mockDrilldown(metric, month, groupId, level, personId)
+    : get<DrilldownRow[]>('/dashboard/drilldown', { metric, month, group: groupId, level, person: personId });
+
+/** 驾驶舱聚合视图：一次请求取回首屏所需全部数据（FR-05 / FR-04 R4 / FR-09 R5） */
+export const getOverview = (month: string, groupId = 'all', level: DrillLevel = 'center'): Promise<DashboardOverview> =>
+  USE_MOCK ? mock.mockOverview(month, groupId, level) : get<DashboardOverview>('/dashboard/overview', { month, group: groupId, level });
 
 /* ---------------- 日报周报（FR-07） ---------------- */
 
