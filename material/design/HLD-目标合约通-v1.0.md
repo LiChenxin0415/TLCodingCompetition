@@ -1,6 +1,6 @@
 # 目标合约通 · 概要设计说明书（HLD）
 
-- **文档版本**：v1.0（对应 PRD v1.1.0）
+- **文档版本**：v1.1（对应 PRD v1.3.0）
 - **需求来源**：`material/requirements/PRD-目标合约通-v1.0.md`（唯一事实来源）
 - **状态**：待评审（本文件为后端 / 前端 / 测试三方可并行开发的依据）
 - **更新日期**：2026-10-15
@@ -36,7 +36,7 @@ API 层（Express Router + 中间件）
    │    ├── DeliverableService    上传白名单 / 发布后锁定(FR-03)
    │    ├── ReportService         日报周报上传与解析(FR-07)
    │    ├── ScoringService        档位评分 / 依据校验 / 发布前置校验(FR-09)
-   │    ├── DashboardService      指标聚合与下钻(FR-05)
+   │    ├── DashboardService      指标聚合与下钻(FR-05) + 部门工作台聚合(FR-10)
    │    └── SkillService          能力标签规则+AI(FR-08)
    ├── AI 服务（ai/）
    │    ├── contractGen.ts        口语→工作包 JSON + 体检
@@ -86,6 +86,7 @@ API 层（Express Router + 中间件）
 | 工作包详情（进度/交付物/留痕） | `/items/{id}` | 本人/组长 | FR-01/03 |
 | 组内合约核对与评分 | `/team/contracts` | leader | FR-09 |
 | 部门看板（下钻） | `/dashboard` | center/leader | FR-05 |
+| 部门工作台（总览/趋势/人效/风险/大目标/总结报告） | `/workbench` | center（leader 本组切片） | FR-10 |
 | 大目标管理 | `/objectives` | center/leader | FR-04 |
 | 合约历史（按月/跨月对比） | `/history` | 本人 | FR-06 |
 | 日报周报 | `/reports` | employee | FR-07 |
@@ -129,6 +130,7 @@ API 层（Express Router + 中间件）
 | start_date / end_date | TEXT | | 起止日期 |
 | status | TEXT | `进行中/已达成/已关闭` | |
 | progress | REAL | 计算值 | 不落库或落库由服务重算，禁止人工写 |
+| is_key | INTEGER(0/1) | 默认 0 | 是否部门年度重点（FR-10 S7） |
 
 **contracts**
 
@@ -158,6 +160,7 @@ API 层（Express Router + 中间件）
 | due_date | TEXT | | 必须在合约月份内 |
 | progress | INTEGER | 0–100 | 回退需原因 |
 | source | TEXT | `manual/AI` | AI 采纳率统计 |
+| value_tag | TEXT | 可空 | 六类价值标签（降本增效/风险防控/质量提升/创新探索/合规保障/支撑保障），未标注计「未分类」（FR-10 S1） |
 | checked | INTEGER(0/1) | | 组长核对标记 |
 
 索引：`idx_items_contract(contract_id)`、`idx_items_objective(objective_id)`。
@@ -242,6 +245,13 @@ confirmed ──月末评分完成──▶ rated ──中心校准──▶ pu
 | 日报周报 | `POST /reports`、`POST /reports/{id}/parse`、`POST /reports/{id}/adopt` | employee | FR-07 |
 | 看板 | `GET /dashboard/metrics` | center/leader | 指标卡数值 |
 | 看板 | `GET /dashboard/drilldown?metric=&level=&group=` | center/leader | 明细列表（条数必须与卡一致，FR-05 R5） |
+| 部门工作台 | `GET /dashboard/overview` | center | 驾驶舱 6 项指标（FR-10 S2） |
+| 部门工作台 | `GET /dashboard/value-distribution?by=count|weight` | center | 价值分布（按数量/权重，FR-10 S1） |
+| 部门工作台 | `GET /dashboard/trend?period=` | center | 部门趋势（环比/同比，FR-10 S4） |
+| 部门工作台 | `GET /dashboard/workload` | center | 人效与负荷（人均完成率/超负荷/富余，FR-10 S5） |
+| 部门工作台 | `GET /dashboard/risks` | center | 部门风险汇聚（等级降序+逾期置顶+月度趋势，FR-10 S6） |
+| 部门工作台 | `GET /objectives/overview` | center | 大目标总览（含年度重点标记，FR-10 S7） |
+| 部门工作台 | `POST /dashboard/summary-report` | center | 生成总结报告四段（FR-10 S3） |
 | 评分 | `PUT /items/{id}/score` | leader | 校验档位/依据/封顶（FR-09 R1/R2/R4） |
 | 评分 | `POST /contracts/{id}/submit-rating` | leader | 合约评分提交 |
 | 校准 | `GET /calibration?month=` | center | 含组内偏差提示（FR-09 R6） |
@@ -283,6 +293,15 @@ confirmed ──月末评分完成──▶ rated ──中心校准──▶ pu
 **大目标加权进度（FR-04 R3）**：`progress = Σ(item.progress × item.weight) ÷ Σ(item.weight)`，保留 1 位小数；无关联时为 0 + 空态。权重调整后实时重算（服务端计算，不缓存）。
 
 **能力标签打分（FR-08 R1，规则+AI）**：工作包文本命中 1 分 / 交付物类型命中 1 分 / 进度留痕命中 0.5 分；累计 ≥2 生成标签并附证据；AI 不可用时纯关键词规则匹配。
+
+**部门工作台聚合规则（FR-10，纯规则，无 AI）**：
+
+- 价值分布：按 `value_tag` 分组计数（`by=count`，默认）或按 `weight` 加权（`by=weight`）；未标注计「未分类」；占比 = 分类数 ÷ 总数。
+- 人均负荷 = 在办工作包总数 ÷ 在职员工数；人均完成率 = 已完成工作包数 ÷ 在职员工数。
+- 负荷预警：成员在办数 > 组均值 + 2 标「超负荷」，< 组均值 − 2 标「富余」（阈值可配，仅提示不拦截，FR-10 R7）。
+- 部门趋势：按 `month` 聚合工作包总数 / 完成率 / 风险数 / 人均负荷，环比（上月）、同比（去年同期）直接查询历史月份（FR-10 R6）。
+- 风险汇聚：风险等级沿用 FR-05 口径，清单按等级降序、逾期项置顶（FR-10 R8）。
+- 总结报告：四段固定结构由聚合数据模板填充，生成时点快照不可篡改，无 AI 依赖。
 
 ---
 
@@ -419,3 +438,4 @@ front/
 | 版本 | 日期 | 说明 |
 | --- | --- | --- |
 | v1.0 | 2026-10-15 | 初版：总体架构、技术选型、数据模型、接口契约、关键规则落地、AI/权限/非功能设计 |
+| v1.1 | 2026-10-15 | 对齐 PRD v1.3.0：新增 FR-10 部门工作台（价值标签/驾驶舱/趋势/人效/风险汇聚/大目标总览/总结报告）；objectives 加 is_key、contract_items 加 value_tag；DashboardService 扩展 + 新增部门工作台接口族 |
