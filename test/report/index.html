@@ -37,6 +37,11 @@
   .phase-head{display:flex;justify-content:space-between;align-items:center;font-weight:600}
   .phase-meta{color:var(--muted);font-size:12px;margin:4px 0 10px}
   table.mini th,table.mini td{padding:5px 8px}
+  .mod-title{font-size:13.5px;margin:18px 0 4px;color:#111827;font-weight:600}
+  table.detail th,table.detail td{padding:5px 8px;font-size:12.5px}
+  table.detail td:nth-child(4){min-width:220px}
+  details summary{cursor:pointer;color:var(--brand);font-size:12px;user-select:none;white-space:nowrap}
+  details .da{margin-top:6px;font-size:12px;color:#374151;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:8px 10px;line-height:1.55;min-width:260px}
   .bar{background:#eef2f7;height:9px;border-radius:6px;overflow:hidden;width:160px}
   .bar span{display:block;height:100%;background:var(--ok)}
   .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
@@ -55,7 +60,7 @@
 <div class="wrap">
   <header>
     <h1>AI 智能周报系统 · 测试报告</h1>
-    <div class="sub">项目：TLCodingCompetition　|　测试类型：功能 / 接口自动化 / 性能 / 前端 UI 走查　|　报告生成时间：2026/10/15 09:34:51　|　服务端当前周次：2026-W42</div>
+    <div class="sub">项目：TLCodingCompetition　|　测试类型：功能 / 接口自动化 / 性能 / 前端 UI 走查　|　报告生成时间：2026/10/15 09:46:30　|　服务端当前周次：2026-W42</div>
   </header>
 
   <div class="cards">
@@ -70,7 +75,7 @@
 
   <h2>一、测试范围与环境</h2>
   <div class="card">
-    <h3>1.1 功能模块覆盖</h3>
+    <h3>1.1 功能模块覆盖（含用例明细）</h3>
     <table>
       <thead><tr><th>模块</th><th>独立用例</th><th>通过</th><th>通过率</th></tr></thead>
       <tbody><tr>
@@ -110,6 +115,332 @@
   <td><div class="bar"><span style="width:100%"></span></div></td>
 </tr></tbody>
     </table>
+    <p class="note" style="margin:10px 0 0">共 37 条独立接口用例，按模块展开如下；「断言明细」可展开查看每条用例的预期与实际响应。</p>
+    <h4 class="mod-title">登录与鉴权（8/8 通过）</h4>
+  <table class="mini detail">
+    <thead><tr><th>用例 ID</th><th>规则</th><th>优先级</th><th>用例标题</th><th>执行模式</th><th>结果</th><th>断言明细</th></tr></thead>
+    <tbody><tr>
+    <td><code>TC-AUTH-01</code></td>
+    <td>AUTH-02</td>
+    <td>P0</td>
+    <td>越权读取他人周报被服务端拦截</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>403 + &quot;无权限访问&quot;<br><b>实际：</b>status=403 body={&quot;code&quot;:403,&quot;message&quot;:&quot;无权限访问&quot;}</div></details></td>
+  </tr><tr>
+    <td><code>TC-AUTH-02</code></td>
+    <td>AUTH-02</td>
+    <td>P0</td>
+    <td>成员数据隔离（仅见本人周报）</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>200，全部 userId=member01，共 2 条（种子历史，本周尚未写入）<br><b>实际：</b>status=200，条数=2，他人数据=0 条</div></details></td>
+  </tr><tr>
+    <td><code>TC-AUTH-05</code></td>
+    <td>AUTH-05</td>
+    <td>P0</td>
+    <td>最后编辑人记录（leader 代编辑后 member 端可见）</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>lastEditorId=leader01<br><b>实际：</b>status=200 lastEditorId=leader01</div></details></td>
+  </tr><tr>
+    <td><code>TC-LOGIN-01</code></td>
+    <td>LOGIN-01</td>
+    <td>P0</td>
+    <td>预置账号列表（登录页账号卡片数据源）</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>200，4 个账号（1 leader + 3 member），leader01=王负责人<br><b>实际：</b>status=200，账号数=4，leader={&quot;id&quot;:&quot;leader01&quot;,&quot;name&quot;:&quot;王负责人&quot;,&quot;role&quot;:&quot;leader&quot;}</div></details></td>
+  </tr><tr>
+    <td><code>TC-LOGIN-02</code></td>
+    <td>LOGIN-02</td>
+    <td>P0</td>
+    <td>免密登录签发 token（成员/负责人两种角色）</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>member01.role=member，leader01.role=leader<br><b>实际：</b>member01.role=member，leader01.role=leader</div></details></td>
+  </tr><tr>
+    <td><code>TC-LOGIN-03</code></td>
+    <td>LOGIN-03 / AUTH-03</td>
+    <td>P0</td>
+    <td>未登录 / 伪造 token 访问受保护接口</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>两种场景均 401 {code:401}<br><b>实际：</b>无token=401，伪造token=401（{&quot;code&quot;:401,&quot;message&quot;:&quot;登录已失效，请重新登录&quot;}）</div></details></td>
+  </tr><tr>
+    <td><code>TC-AUTH-04</code></td>
+    <td>AUTH-04</td>
+    <td>P1</td>
+    <td>成员访问团队视图被拒（切换账号后原 leader 数据不可见的服务端体现）</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>403<br><b>实际：</b>status=403 body={&quot;code&quot;:403,&quot;message&quot;:&quot;无权限访问&quot;}</div></details></td>
+  </tr><tr>
+    <td><code>TC-LOGIN-02b</code></td>
+    <td>LOGIN-02</td>
+    <td>P1</td>
+    <td>未知 userId 登录被拒绝</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>400 {code:400, message 含&quot;不存在&quot;}<br><b>实际：</b>status=400 body={&quot;code&quot;:400,&quot;message&quot;:&quot;用户 ghost 不存在&quot;}</div></details></td>
+  </tr></tbody>
+  </table><h4 class="mod-title">周报模板（2/2 通过）</h4>
+  <table class="mini detail">
+    <thead><tr><th>用例 ID</th><th>规则</th><th>优先级</th><th>用例标题</th><th>执行模式</th><th>结果</th><th>断言明细</th></tr></thead>
+    <tbody><tr>
+    <td><code>TC-TPL-01</code></td>
+    <td>TPL-01</td>
+    <td>P1</td>
+    <td>周报模板四字段结构</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>四字段齐全，且每项带 maxItems/maxLen 约束<br><b>实际：</b>status=200 keys=[&quot;weekDone&quot;,&quot;ongoing&quot;,&quot;issues&quot;,&quot;nextPlan&quot;]</div></details></td>
+  </tr><tr>
+    <td><code>TC-TPL-03</code></td>
+    <td>TPL-03</td>
+    <td>P1</td>
+    <td>issues 缺省按&quot;暂无&quot;处理</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>200，issues=[&quot;暂无&quot;]<br><b>实际：</b>status=200 issues=[&quot;暂无&quot;]</div></details></td>
+  </tr></tbody>
+  </table><h4 class="mod-title">AI 生成（9/9 通过）</h4>
+  <table class="mini detail">
+    <thead><tr><th>用例 ID</th><th>规则</th><th>优先级</th><th>用例标题</th><th>执行模式</th><th>结果</th><th>断言明细</th></tr></thead>
+    <tbody><tr>
+    <td><code>TC-GEN-01</code></td>
+    <td>GEN-01</td>
+    <td>P0</td>
+    <td>空输入拒绝生成</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>两种情况均 400 &quot;请输入本周工作描述&quot;<br><b>实际：</b>空串=400(请输入本周工作描述)，缺失=400(请输入本周工作描述)</div></details></td>
+  </tr><tr>
+    <td><code>TC-GEN-02</code></td>
+    <td>GEN-02</td>
+    <td>P0</td>
+    <td>超长输入拒绝生成</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>400，message 提示不超过 2000 字<br><b>实际：</b>status=400 body={&quot;code&quot;:400,&quot;message&quot;:&quot;输入长度不能超过 2000 字&quot;}</div></details></td>
+  </tr><tr>
+    <td><code>TC-GEN-04</code></td>
+    <td>GEN-04 / 6.3</td>
+    <td>P0</td>
+    <td>AI 正常生成（含 markdown 围栏剥离与 JSON 严格解析）</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>200，四字段齐全且与 Mock 输出一致（证明围栏剥离 + JSON 解析成功）<br><b>实际：</b>status=200 weekDone=[&quot;完成登录接口联调&quot;,&quot;周报模块 CRUD 实现&quot;]</div></details></td>
+  </tr><tr>
+    <td><code>TC-GEN-04b</code></td>
+    <td>GEN-04</td>
+    <td>P0</td>
+    <td>AI 生成超时返回 504（Mock 挂起 20s）</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>504 &quot;AI 生成超时，请重试&quot;，且耗时 ≥15s（确属超时而非快速失败）<br><b>实际：</b>status=504 耗时=20.0s body={&quot;code&quot;:504,&quot;message&quot;:&quot;AI 生成超时，请重试&quot;}</div></details></td>
+  </tr><tr>
+    <td><code>TC-GEN-06</code></td>
+    <td>GEN-06 / 6.3</td>
+    <td>P0</td>
+    <td>AI 生成失败返回 504 通用文案（不暴露原始错误）</td>
+    <td>AI 故障</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>504 &quot;生成失败，请重试&quot;，无原始错误泄露<br><b>实际：</b>status=504 body={&quot;code&quot;:504,&quot;message&quot;:&quot;生成失败，请重试&quot;}</div></details></td>
+  </tr><tr>
+    <td><code>TC-GEN-06b</code></td>
+    <td>GEN-06 / OVR-07</td>
+    <td>P0</td>
+    <td>AI 团队汇总失败返回 504 通用文案</td>
+    <td>AI 故障</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>504 &quot;生成失败，请重试&quot;<br><b>实际：</b>status=504 body={&quot;code&quot;:504,&quot;message&quot;:&quot;生成失败，请重试&quot;}</div></details></td>
+  </tr><tr>
+    <td><code>TC-GEN-07a</code></td>
+    <td>GEN-07</td>
+    <td>P0</td>
+    <td>降级模式：个人生成返回空模板</td>
+    <td>降级模式</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>200，空模板（四字段为空数组，issues=[&quot;暂无&quot;]）<br><b>实际：</b>status=200 body={&quot;weekDone&quot;:[],&quot;ongoing&quot;:[],&quot;issues&quot;:[&quot;暂无&quot;],&quot;nextPlan&quot;:[]}</div></details></td>
+  </tr><tr>
+    <td><code>TC-GEN-07b</code></td>
+    <td>GEN-07 / OVR-06</td>
+    <td>P0</td>
+    <td>降级模式：团队汇总走规则化聚合</td>
+    <td>降级模式</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>200，overall 含&quot;降级模式&quot;，achievements 含&quot;李成员：&quot;<br><b>实际：</b>status=200 overall=&quot;本周共 1 名成员填写周报（已提交 1 份、草稿 0 份）。当前为降级模式下的规…&quot; achievements=[&quot;李成员：完成周报模块接口联调&quot;,&quot;李成员：编写接口冒烟用例&quot;]</div></details></td>
+  </tr><tr>
+    <td><code>TC-GEN-07c</code></td>
+    <td>GEN-07 / OVR-08</td>
+    <td>P1</td>
+    <td>降级模式：汇总结果可导出</td>
+    <td>降级模式</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>200，BOM+四段标题齐全<br><b>实际：</b>status=200 BOM=有(EF BB BF) 正文前30字=&quot;﻿整体进展：\n本周共 1 名成员填写周报（已提交 1 份、草&quot;</div></details></td>
+  </tr></tbody>
+  </table><h4 class="mod-title">周报状态机（4/4 通过）</h4>
+  <table class="mini detail">
+    <thead><tr><th>用例 ID</th><th>规则</th><th>优先级</th><th>用例标题</th><th>执行模式</th><th>结果</th><th>断言明细</th></tr></thead>
+    <tbody><tr>
+    <td><code>TC-REP-01</code></td>
+    <td>REP-01</td>
+    <td>P0</td>
+    <td>周报状态机：草稿 → 提交</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>draft→submitted，week=2026-W42<br><b>实际：</b>status=200 状态=submitted week=2026-W42</div></details></td>
+  </tr><tr>
+    <td><code>TC-REP-02</code></td>
+    <td>REP-02</td>
+    <td>P0</td>
+    <td>已提交周报被编辑后回退草稿</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>200，status=draft<br><b>实际：</b>status=200 状态=draft</div></details></td>
+  </tr><tr>
+    <td><code>TC-REP-03</code></td>
+    <td>REP-03</td>
+    <td>P0</td>
+    <td>同周次重复保存为更新（不新增）</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>id 保持 rpt_bddecedb274f49d6，本周报 1 条<br><b>实际：</b>返回id=rpt_bddecedb274f49d6，本周条数=1</div></details></td>
+  </tr><tr>
+    <td><code>TC-REP-04</code></td>
+    <td>REP-04</td>
+    <td>P1</td>
+    <td>预置历史周报存在</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>2026-W41=submitted，2026-W40=draft<br><b>实际：</b>status=200 周次分布=[[&quot;2026-W41&quot;,&quot;submitted&quot;],[&quot;2026-W40&quot;,&quot;draft&quot;]]</div></details></td>
+  </tr></tbody>
+  </table><h4 class="mod-title">负责人代管（4/4 通过）</h4>
+  <table class="mini detail">
+    <thead><tr><th>用例 ID</th><th>规则</th><th>优先级</th><th>用例标题</th><th>执行模式</th><th>结果</th><th>断言明细</th></tr></thead>
+    <tbody><tr>
+    <td><code>TC-LEAD-03</code></td>
+    <td>LEAD-03</td>
+    <td>P0</td>
+    <td>负责人代编辑成员周报</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>200，lastEditorId=leader01<br><b>实际：</b>status=200 lastEditorId=leader01</div></details></td>
+  </tr><tr>
+    <td><code>TC-LEAD-01</code></td>
+    <td>LEAD-01</td>
+    <td>P1</td>
+    <td>团队周报列表（裸数组 + 未开始成员 report=null）</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>数组 4 项；leader01 等无周报者 report=null，3 名成员有上周周报<br><b>实际：</b>status=200 人数=4 未开始=[&quot;leader01&quot;] 有报=[&quot;member01&quot;,&quot;member02&quot;,&quot;member03&quot;]</div></details></td>
+  </tr><tr>
+    <td><code>TC-LEAD-02</code></td>
+    <td>LEAD-02</td>
+    <td>P1</td>
+    <td>团队列表行字段完整</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>report 字段齐全（含 lastEditorId/updatedAt）<br><b>实际：</b>status=200 report={&quot;id&quot;:&quot;rpt_seed_member01_2026-W41&quot;,&quot;userId&quot;:&quot;member01&quot;,&quot;week&quot;:&quot;2026-W41&quot;,&quot;weekDone&quot;:[&quot;完成登录模块接口联调&quot;,&quot;周报模板查询接口上线&quot;,&quot;AI 生成接口联调通过&quot;],&quot;ongoing&quot;:[&quot;团队总览页开发（70%）&quot;,&quot;权限用例编写（</div></details></td>
+  </tr><tr>
+    <td><code>TC-LEAD-04</code></td>
+    <td>LEAD-04</td>
+    <td>P2</td>
+    <td>并发场景最后写入优先</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>最终 weekDone[0]=负责人写入内容，lastEditorId=leader01<br><b>实际：</b>weekDone[0]=负责人最后一次写入的内容乙 lastEditorId=leader01</div></details></td>
+  </tr></tbody>
+  </table><h4 class="mod-title">团队总览与导出（7/7 通过）</h4>
+  <table class="mini detail">
+    <thead><tr><th>用例 ID</th><th>规则</th><th>优先级</th><th>用例标题</th><th>执行模式</th><th>结果</th><th>断言明细</th></tr></thead>
+    <tbody><tr>
+    <td><code>TC-OVR-01</code></td>
+    <td>OVR-01</td>
+    <td>P0</td>
+    <td>风险高亮三态数据（有风险 / 暂无 / 未开始）</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>member01=暂无（无风险）、member02=有风险、member03=未开始(null)<br><b>实际：</b>m1.issues=[&quot;暂无&quot;] m2.issues=[&quot;导出 .txt 编码乱码，需确认 UTF-8&quot;,&quot;测试环境数据库偶发连接超时&quot;] m3.report=null</div></details></td>
+  </tr><tr>
+    <td><code>TC-OVR-06</code></td>
+    <td>OVR-06</td>
+    <td>P0</td>
+    <td>AI 团队汇总四段结构（含成员姓名）</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>四段齐全，achievements 含&quot;姓名：&quot;前缀<br><b>实际：</b>status=200 overall=&quot;本周团队整体推进顺利，核心接口联调完成，总览页待收尾。…&quot; achievements=[&quot;李成员：完成登录与周报 CRUD&quot;,&quot;张成员：模板查询接口&quot;,&quot;王负责人：代补风险说明&quot;]</div></details></td>
+  </tr><tr>
+    <td><code>TC-OVR-05</code></td>
+    <td>OVR-05</td>
+    <td>P1</td>
+    <td>本周无任何周报时汇总被拒</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>400 &quot;暂无可汇总的周报&quot;<br><b>实际：</b>status=400 body={&quot;code&quot;:400,&quot;message&quot;:&quot;暂无可汇总的周报&quot;}</div></details></td>
+  </tr><tr>
+    <td><code>TC-OVR-05d</code></td>
+    <td>OVR-05 / GEN-07</td>
+    <td>P1</td>
+    <td>降级模式：无周报时汇总仍被拒</td>
+    <td>降级模式</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>400 &quot;暂无可汇总的周报&quot;<br><b>实际：</b>status=400 body={&quot;code&quot;:400,&quot;message&quot;:&quot;暂无可汇总的周报&quot;}</div></details></td>
+  </tr><tr>
+    <td><code>TC-OVR-08a</code></td>
+    <td>OVR-08</td>
+    <td>P1</td>
+    <td>导出团队周报 .txt（文件名/编码/四段正文）</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>200；Content-Disposition 含中文文件名；文件头 3 字节为 UTF-8 BOM；四段标题齐全<br><b>实际：</b>status=200 cd=&quot;attachment; filename=&quot;team-weekly-2026-W42.txt&quot;; filename*=UTF-8''%E5%9B%A2%E9%98%9F%E5%91…&quot; BOM=有(EF BB BF) 正文前40字=&quot;﻿整体进展：\n本周团队整体推进顺利，核心接口联调完成，总览页待收尾。\n\n关键成果&quot;</div></details></td>
+  </tr><tr>
+    <td><code>TC-OVR-08b</code></td>
+    <td>OVR-08</td>
+    <td>P1</td>
+    <td>未生成快照的周次导出被拒</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>400 &quot;请先生成团队周报后再导出&quot;<br><b>实际：</b>status=400 body={&quot;code&quot;:400,&quot;message&quot;:&quot;请先生成团队周报后再导出&quot;}</div></details></td>
+  </tr><tr>
+    <td><code>TC-OVR-09</code></td>
+    <td>OVR-09</td>
+    <td>P2</td>
+    <td>团队周报快照不随成员修改自动更新</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>两次导出内容完全一致（服务端保存快照，非实时重算）<br><b>实际：</b>status=200 与首次导出一致=true</div></details></td>
+  </tr></tbody>
+  </table><h4 class="mod-title">边界与错误（3/3 通过）</h4>
+  <table class="mini detail">
+    <thead><tr><th>用例 ID</th><th>规则</th><th>优先级</th><th>用例标题</th><th>执行模式</th><th>结果</th><th>断言明细</th></tr></thead>
+    <tbody><tr>
+    <td><code>TC-EDGE-03a</code></td>
+    <td>EDGE / 6.1</td>
+    <td>P0</td>
+    <td>字段条数校验（400）</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>400，message 提示 2—5 条<br><b>实际：</b>status=400 body={&quot;code&quot;:400,&quot;message&quot;:&quot;本周完成需 2—5 条，当前 1 条&quot;}</div></details></td>
+  </tr><tr>
+    <td><code>TC-EDGE-03b</code></td>
+    <td>EDGE / 8</td>
+    <td>P0</td>
+    <td>统一错误响应体 {code,message}</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>四种错误均 {code,message} 且 code===HTTP 状态<br><b>实际：</b>400=400 401=401 403=403 404=404</div></details></td>
+  </tr><tr>
+    <td><code>TC-EDGE-02</code></td>
+    <td>EDGE / REP-04</td>
+    <td>P2</td>
+    <td>历史周次周报可编辑（规则同本周）</td>
+    <td>AI 启用</td>
+    <td class="r-ok">PASS</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>200，submitted→draft（与本周规则一致）<br><b>实际：</b>status=200 状态=draft</div></details></td>
+  </tr></tbody>
+  </table>
     <h3>1.2 测试环境</h3>
     <ul class="note" style="margin:6px 0">
       <li><b>运行时</b>：Node v24.14.0（后端要求 ≥24，node:sqlite 免编译直接运行 .ts）</li>

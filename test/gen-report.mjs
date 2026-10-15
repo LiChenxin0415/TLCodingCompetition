@@ -34,7 +34,9 @@ const CURRENT_WEEK = isoWeekOf(new Date());
 
 // ---- 汇总统计 ----
 const allCases = [];
-for (const ph of Object.values(phases)) for (const c of ph.cases) allCases.push({ ...c, phase: ph.base });
+for (const [phaseName, ph] of Object.entries(phases)) {
+  for (const c of ph.cases) allCases.push({ ...c, phaseName, base: ph.base });
+}
 // 独立用例（按 id 去重，统计覆盖的规则）
 const byId = new Map();
 for (const c of allCases) if (!byId.has(c.id)) byId.set(c.id, c);
@@ -96,6 +98,29 @@ const moduleStats = Object.entries(moduleMap).map(([name, prefixes]) => {
   const cs = uniqueCases.filter((c) => prefixes.some((p) => c.rule.startsWith(p)));
   return { name, total: cs.length, pass: cs.filter((c) => c.pass).length };
 });
+
+// 模块用例明细（每个模块展开具体用例：ID/规则/优先级/标题/执行模式/结果/断言明细）
+const phaseLabel = { ai: 'AI 启用', fail: 'AI 故障', degraded: '降级模式', any: '全模式' };
+const moduleDetails = Object.entries(moduleMap).map(([name, prefixes]) => {
+  const cs = uniqueCases
+    .filter((c) => prefixes.some((p) => c.rule.startsWith(p)))
+    .sort((a, b) => a.priority.localeCompare(b.priority) || a.id.localeCompare(b.id));
+  if (cs.length === 0) return '';
+  const rows = cs.map((c) => `<tr>
+    <td><code>${esc(c.id)}</code></td>
+    <td>${esc(c.rule)}</td>
+    <td>${esc(c.priority)}</td>
+    <td>${esc(c.title)}</td>
+    <td>${esc(phaseLabel[c.phaseName] ?? c.phaseName ?? '—')}</td>
+    <td class="r-${c.pass ? 'ok' : 'bad'}">${c.pass ? 'PASS' : 'FAIL'}</td>
+    <td><details><summary>预期 / 实际</summary><div class="da"><b>预期：</b>${esc(c.expected)}<br><b>实际：</b>${esc(c.actual)}</div></details></td>
+  </tr>`).join('');
+  return `<h4 class="mod-title">${esc(name)}（${cs.filter((c) => c.pass).length}/${cs.length} 通过）</h4>
+  <table class="mini detail">
+    <thead><tr><th>用例 ID</th><th>规则</th><th>优先级</th><th>用例标题</th><th>执行模式</th><th>结果</th><th>断言明细</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}).join('');
 
 // 截图清单（按文件存在性）
 const shotFiles = [
@@ -244,6 +269,11 @@ const html = `<!DOCTYPE html>
   .phase-head{display:flex;justify-content:space-between;align-items:center;font-weight:600}
   .phase-meta{color:var(--muted);font-size:12px;margin:4px 0 10px}
   table.mini th,table.mini td{padding:5px 8px}
+  .mod-title{font-size:13.5px;margin:18px 0 4px;color:#111827;font-weight:600}
+  table.detail th,table.detail td{padding:5px 8px;font-size:12.5px}
+  table.detail td:nth-child(4){min-width:220px}
+  details summary{cursor:pointer;color:var(--brand);font-size:12px;user-select:none;white-space:nowrap}
+  details .da{margin-top:6px;font-size:12px;color:#374151;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:8px 10px;line-height:1.55;min-width:260px}
   .bar{background:#eef2f7;height:9px;border-radius:6px;overflow:hidden;width:160px}
   .bar span{display:block;height:100%;background:var(--ok)}
   .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
@@ -277,11 +307,13 @@ const html = `<!DOCTYPE html>
 
   <h2>一、测试范围与环境</h2>
   <div class="card">
-    <h3>1.1 功能模块覆盖</h3>
+    <h3>1.1 功能模块覆盖（含用例明细）</h3>
     <table>
       <thead><tr><th>模块</th><th>独立用例</th><th>通过</th><th>通过率</th></tr></thead>
       <tbody>${moduleRows}</tbody>
     </table>
+    <p class="note" style="margin:10px 0 0">共 ${totalUnique} 条独立接口用例，按模块展开如下；「断言明细」可展开查看每条用例的预期与实际响应。</p>
+    ${moduleDetails}
     <h3>1.2 测试环境</h3>
     <ul class="note" style="margin:6px 0">
       <li><b>运行时</b>：Node ${perf ? esc(perf.node) : '24.x'}（后端要求 ≥24，node:sqlite 免编译直接运行 .ts）</li>
