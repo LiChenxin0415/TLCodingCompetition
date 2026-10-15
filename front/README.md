@@ -1,20 +1,82 @@
 # front — 前端代码
 
-本目录存放本项目的**前端工程代码**，由前端相关智能体负责维护。
+本目录存放本项目的**前端工程代码**（《目标合约通》），由前端相关智能体负责维护。
 
-> **当前状态：空目录（仅本 README 占位）**，前端脚手架尚未创建。
+> **当前状态：已完成 P0/P1/P2 全部九个功能（FR-01 ~ FR-09）的前端实现**，`tsc --noEmit` 与 `vite build` 均已通过。
+> 依据：`material/design/HLD-目标合约通-v1.0.md`（概设）、`material/requirements/PRD-目标合约通-v1.0.md`（需求）。
 
 ---
 
-## 一、目录约定
+## 零、快速启动
+
+```bash
+cd front
+npm install              # 已实测通过（npm registry 直装，无需原生编译）
+cp .env.example .env     # 可选：默认即 Mock 模式
+npm run dev              # http://localhost:5173
+npm run build            # tsc --noEmit + vite build
+```
+
+**默认走内置 Mock 适配器，后端未启动也能完整演示闭环**；后端就绪后把 `.env` 里的 `VITE_USE_MOCK` 改成 `false`，由 Vite 将 `/api` 代理到 `http://localhost:3000`。
+
+**演示账号（免密登录，点选身份即可）**
+
+| 账号 | 姓名 | 角色 | 演示重点 |
+| --- | --- | --- | --- |
+| dept01 | 王部长 | center | 部门全局视角 + 确认发布 |
+| center01 | 李中心 | center | 组间校准 + 全中心看板 |
+| leader01 | 赵组长 | leader | A 组核对/评分（含无交付物封顶 95） |
+| leader02 | 钱组长 | leader | B 组（成员无合约空态） |
+| member01 | 张伟 | employee | AI 进度更新、风险/逾期项 |
+| member02 | 李娜 | employee | 含未上传交付物工作包（封顶 95 演示） |
+| member03 | 王强 | employee | 本月无合约（创建 + AI 生成空态） |
+
+---
+
+## 一、技术栈与目录结构
+
+对齐 HLD §3 / §13：
+
+| 层 | 选型 | 版本 |
+| --- | --- | --- |
+| 框架 | React + TypeScript | 18.3 |
+| 构建 | Vite | 5.x（端口 **5173**，`/api` → 后端 **3000**） |
+| UI | Ant Design | 5.x |
+| 路由 | React Router | 6.x |
+| 请求 | Axios | 1.x |
+| 状态 | Zustand | 4.x（仅存 token / user） |
 
 ```
 front/
-├── README.md        # 本文件：前端说明与启动方式
-└── <工程根目录>/     # 前端工程（脚手架生成后放在这里，或直接以 front/ 为工程根）
+├─ index.html / package.json / vite.config.ts / tsconfig.json / .env.example / .gitignore
+└─ src/
+   ├─ main.tsx, App.tsx                  # 路由 + 登录/角色守卫
+   ├─ types.ts                           # 数据模型与四类/八类/优先级/状态机枚举（HLD §5）
+   ├─ pages/                             # 10 个页面（见下表）
+   ├─ components/                        # TopNav / ItemTable / AIConfirmBar / ScoreInput / RiskTag / EmptyState
+   ├─ services/
+   │   ├─ http.ts                        # Axios 实例，401/403/422/504 统一归一化
+   │   ├─ api.ts                         # 唯一切换点：Mock ↔ 真实接口（路径对齐 HLD §7）
+   │   ├─ mock.ts                        # Mock 适配器：规则、状态机、权限、延时、降级
+   │   └─ seed.ts                        # 种子数据：7 账号 / 2 大目标 / 当月 8 工作包 / 两个月历史
+   ├─ store/auth.ts                      # 登录态
+   └─ utils/{rules,error,file}.ts        # 体检/权重/评分/加权进度、错误降级、导出
 ```
 
-> 脚手架生成后，请把**技术栈、目录结构、启动命令、接口基地址**补充到本文件，并立即 push。
+**页面 ↔ 路由 ↔ 角色 ↔ FR 映射（HLD §4.1）**
+
+| 页面 | 路由 | 角色 | FR |
+| --- | --- | --- | --- |
+| 登录 / 身份选择 | `/login` | 所有人 | — |
+| 我的合约（AI 生成 + 体检 + 提交） | `/contracts/mine` | employee | FR-02 |
+| 工作包详情（进度/交付物/双留痕） | `/items/:id` | 本人/组长 | FR-01/03 |
+| 组内合约核对与评分 | `/team/contracts` | leader | FR-09 |
+| 部门看板（指标卡下钻） | `/dashboard` | leader/center | FR-05 |
+| 大目标管理（加权进度/贡献占比） | `/objectives` | leader/center | FR-04 |
+| 合约历史（按月只读 + 跨月对比） | `/history` | 本人 | FR-06 |
+| 日报周报 | `/reports` | employee | FR-07 |
+| 能力画像 | `/skills` | 本人/组长/中心 | FR-08 |
+| 中心校准与发布 | `/calibration` | center | FR-09 |
 
 ---
 
@@ -55,15 +117,30 @@ front/
 
 ---
 
-## 五、待补充（脚手架就绪后逐项填写）
+## 五、关键实现说明
 
-- [ ] 技术栈与版本（框架、UI 组件库、状态管理、构建工具）
-- [ ] 安装与启动命令（含开发端口）
-- [ ] 环境变量说明（`.env.example`，含请求基地址与代理配置）
-- [ ] 目录结构与页面/路由清单
-- [ ] 接口基地址与联调方式（直连后端还是 dev 代理）
-- [ ] 三态规范（空态/加载态/错误态）与失败降级策略
-- [ ] 页面级验收清单（路演前逐条走查用）
+### 1. 硬规则落点（HLD §8 六条规则，前端侧）
+
+| 规则 | 实现位置 |
+| --- | --- |
+| 3–5 个工作包、权重合计 = 100% | `MyContract` 实时显示合计，≠100 禁用「提交核对」；`utils/rules.validateContract` 逐项校验 |
+| 目标含数字 + 时限 + 可验证动词 | `utils/rules.checkItem`：`100 −(无数字25 + 无动词20 + 过短15 + 无时限20 + 无交付物20)`，<80 标红列 issue |
+| 无交付物封顶 95 | `ScoreInput` + `TeamContracts`：>95 需二次确认并填理由 |
+| 置信度 < 0.6 不给结论 | `AIConfirmBar`：低置信度仅展示候选列表由用户点选 |
+| 月度得分公式 / 已发布只读 | `utils/rules.monthlyScore`；`published` 状态隐藏编辑/上传/评分入口，历史页只读 |
+| 偏离 100 必填依据 / 发布前置校验 | `ScoreInput` 依据必填；`Calibration` 展示三项校验结果并在未通过时禁用发布 |
+
+### 2. Mock 适配器
+
+- 完整模拟 HLD §7 的接口行为与错误码（400/401/403/404/409/422/504），**规则口径与后端一致**，不是静态假数据。
+- `VITE_AI_ENABLED=false` 时 AI 接口返回 **504**，用于演练「AI 降级为手工」全流程（PRD §12）。
+- 演示闭环可直接走到：AI 生成合约 → 体检 → 提交 → 组长核对 → 说一句更新进度 → 上传交付物 → 评分封顶 → 中心校准 → 发布 → 历史只读回看。
+
+### 3. 三态与降级
+
+- 空态：无合约 / 无大目标 / 无在办工作包 / 无历史月份 / 无能力标签，均有 `EmptyState` 文案与引导按钮（PRD §12）。
+- 错误态：401 跳登录；403 提示「仅本人/本组可见」；422 走表单级拦截提示；504/500 判定为可降级（`utils/error.isDegradable`）→ 切换手工兜底。
+- 加载态：统一 antd skeleton/spin 与按钮 loading。
 
 ---
 
@@ -72,3 +149,13 @@ front/
 | 版本 | 日期 | 说明 |
 | --- | --- | --- |
 | v1.0 | 2026-10 | 初始化：目录约定、协作要求、环境须知、待补充清单 |
+| v2.0 | 2026-10-15 | 按 HLD v1.0 完成前端全量实现：10 个页面 + 6 个公共组件 + Mock 适配器 + 种子数据；`tsc --noEmit` 与 `vite build` 均通过 |
+
+---
+
+## 七、联调待办（后端接口就绪后）
+
+- [ ] 将 `.env` 的 `VITE_USE_MOCK` 置 `false`，逐页回归 HLD §7 各接口
+- [ ] 确认真实后端的 422 返回体是否为 `{code, message}`；若字段不同，只需改 `services/http.ts` 拦截器
+- [ ] 文件直传：当前 Mock 仅记录文件元信息，真实上传需改为 `multipart/form-data`（`PUT/POST /items/{id}/deliverables`）
+- [ ] 台账导出字段与后端 CSV/Excel 列顺序对齐（PRD FR-06 R4）
