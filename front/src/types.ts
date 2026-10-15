@@ -322,6 +322,8 @@ export interface DashboardOverview {
   /** 组筛选选项：与当前 scope 无关，避免选中某组后候选项塌陷 */
   group_options: { group_id: string; group_name: string }[];
   persons: PersonStat[];
+  /** 成员筛选选项：取自可见全量，避免个人级收敛后无法切换到其他成员 */
+  person_options: { user_id: string; user_name: string; group_name: string }[];
   type_slices: TypeSlice[];
   tier_slices: TierSlice[];
   risk_top: DrilldownRow[];

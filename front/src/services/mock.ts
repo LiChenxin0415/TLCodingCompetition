@@ -1156,11 +1156,20 @@ export const mockOverview = (
       },
     ];
 
-    /* 8) 组筛选选项：按角色权限恒定给出，不受当前 groupId 影响，避免选中后选项塌陷 */
+    /* 8) 筛选项：按角色权限恒定给出，不受当前 groupId / personId 影响，避免选中后候选项塌陷 */
     const group_options = db.groups
       .filter((g) => g.id !== 'grp_root')
       .filter((g) => (u.role === 'center' ? true : g.id === u.group_id))
       .map((g) => ({ group_id: g.id, group_name: g.name }));
+
+    const person_options = allMemberIds.map((uid) => {
+      const owner = db.users.find((x) => x.id === uid) as User;
+      return {
+        user_id: uid,
+        user_name: owner.name,
+        group_name: db.groups.find((g) => g.id === owner.group_id)?.name ?? '—',
+      };
+    });
 
     return {
       month,
@@ -1171,6 +1180,7 @@ export const mockOverview = (
       groups,
       group_options,
       persons,
+      person_options,
       type_slices,
       tier_slices,
       risk_top,
